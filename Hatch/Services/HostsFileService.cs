@@ -23,7 +23,7 @@ public class HostsFileService
         if (!File.Exists(HostsPath))
             return entries;
 
-        var lines = File.ReadAllLines(HostsPath, Encoding.UTF8);
+        var lines = File.ReadAllLines(HostsPath, DetectEncoding());
 
         foreach (var line in lines)
         {
@@ -112,7 +112,7 @@ public class HostsFileService
         if (!File.Exists(HostsPath))
             return string.Empty;
 
-        return File.ReadAllText(HostsPath, Encoding.UTF8);
+        return File.ReadAllText(HostsPath, DetectEncoding());
     }
 
     public void WriteHostsFileRaw(string content)
@@ -121,6 +121,26 @@ public class HostsFileService
     }
 
     public static string GetHostsPath() => HostsPath;
+
+    /// <summary>
+    /// hosts ファイルのエンコーディングを検出する。BOM があれば UTF-8、なければシステムデフォルト。
+    /// </summary>
+    private static Encoding DetectEncoding()
+    {
+        if (!File.Exists(HostsPath)) return Encoding.UTF8;
+        try
+        {
+            var bom = new byte[3];
+            using var fs = File.OpenRead(HostsPath);
+            fs.Read(bom, 0, 3);
+            if (bom[0] == 0xEF && bom[1] == 0xBB && bom[2] == 0xBF)
+                return Encoding.UTF8;
+        }
+        catch { }
+        // BOM なし → システムデフォルト（日本語環境では Shift_JIS）
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        return Encoding.GetEncoding(932);
+    }
 
     public bool CanWriteHostsFile()
     {
