@@ -24,7 +24,6 @@
                 <RowDefinition Height="32"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
@@ -54,71 +53,67 @@
             </Grid>
 
             <!-- Toolbar Row 1: Entry operations + File -->
-            <Border Grid.Row="1" Background="#24242C" BorderBrush="#383840" BorderThickness="0,0,0,0"
-                    Padding="8,4">
-                <DockPanel>
-                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                        <Button Content="追加" Click="AddButton_Click"
-                                Style="{StaticResource ToolbarButton}"
-                                Margin="0,0,4,0"/>
-                        <Button Content="編集" Click="EditButton_Click"
-                                Style="{StaticResource ToolbarButton}"
-                                Margin="0,0,4,0"/>
-                        <Button Content="削除" Command="{Binding DeleteCommand}"
-                                Style="{StaticResource ToolbarButton}"
-                                Margin="0,0,12,0"/>
-
-                        <Border Width="1" Background="#383840" Margin="0,2,12,2"/>
-
-                        <Button Content="最新化" Command="{Binding ReloadCommand}"
-                                Style="{StaticResource ToolbarButton}"
-                                Margin="0,0,4,0"/>
-                        <Button Content="適用" Command="{Binding ApplyCommand}"
-                                Style="{StaticResource ToolbarButton}"
-                                Margin="0,0,12,0"/>
-
-                        <Border Width="1" Background="#383840" Margin="0,2,12,2"/>
-
-                        <Button Content="テキスト編集" Click="TextEditorButton_Click"
-                                Style="{StaticResource ToolbarButton}"
-                                Margin="0,0,4,0"
-                                ToolTip="hostsファイルをテキストとして直接編集"/>
-                        <Button Content="バックアップ" Click="BackupButton_Click"
-                                Style="{StaticResource ToolbarButton}"
-                                Margin="0,0,4,0"
-                                ToolTip="現在のhostsファイルをバックアップ"/>
-                        <Button Content="リストア" Click="RestoreButton_Click"
-                                Style="{StaticResource ToolbarButton}"
-                                ToolTip="バックアップからhostsファイルを復元"/>
-                    </StackPanel>
-                </DockPanel>
-            </Border>
-
-            <!-- Toolbar Row 2: Preset -->
-            <Border Grid.Row="2" Background="#24242C" BorderBrush="#383840" BorderThickness="0,0,0,1"
-                    Padding="8,3">
+            <!-- Toolbar -->
+            <Border Grid.Row="1" Background="#24242C" BorderBrush="#383840" BorderThickness="0,0,0,1"
+                    Padding="4,3">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="プリセット:" Foreground="#808090" FontSize="12"
-                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <!-- Entry CRUD -->
+                    <Button Click="AddButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="追加">
+                        <TextBlock Text="&#xE710;" Style="{StaticResource IconText}"/>
+                    </Button>
+                    <Button Click="EditButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="編集">
+                        <TextBlock Text="&#xE70F;" Style="{StaticResource IconText}"/>
+                    </Button>
+                    <Button Command="{Binding DeleteCommand}" Style="{StaticResource ToolbarIconButton}" ToolTip="削除">
+                        <TextBlock Text="&#xE74D;" Style="{StaticResource IconText}"/>
+                    </Button>
+
+                    <Border Width="1" Background="#383840" Margin="6,4,6,4"/>
+
+                    <!-- File operations -->
+                    <Button Command="{Binding ReloadCommand}" Style="{StaticResource ToolbarIconButton}" ToolTip="最新化 (F5)">
+                        <TextBlock Text="&#xE72C;" Style="{StaticResource IconText}"/>
+                    </Button>
+                    <Button Command="{Binding ApplyCommand}" Style="{StaticResource ToolbarIconButton}" ToolTip="適用 (Ctrl+S)">
+                        <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}"/>
+                    </Button>
+
+                    <Border Width="1" Background="#383840" Margin="6,4,6,4"/>
+
+                    <!-- Text editor / Backup / Restore -->
+                    <Button Click="TextEditorButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="テキスト編集">
+                        <TextBlock Text="&#xE7C5;" Style="{StaticResource IconText}"/>
+                    </Button>
+                    <Button Click="BackupButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="バックアップ">
+                        <TextBlock Text="&#xE78C;" Style="{StaticResource IconText}"/>
+                    </Button>
+                    <Button Click="RestoreButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="リストア">
+                        <TextBlock Text="&#xE7AC;" Style="{StaticResource IconText}"/>
+                    </Button>
+
+                    <Border Width="1" Background="#383840" Margin="6,4,6,4"/>
+
+                    <!-- Preset -->
+                    <TextBlock Text="&#xE74E;" FontFamily="Segoe Fluent Icons" FontSize="13"
+                               Foreground="#808090" VerticalAlignment="Center" Margin="0,0,6,0"/>
                     <ComboBox ItemsSource="{Binding PresetNames}"
                               SelectedItem="{Binding SelectedPresetName}"
                               Width="150" FontSize="12"
                               VerticalAlignment="Center"
                               Background="#2D2D30" Foreground="#E0E0E0"
                               BorderBrush="#3F3F46"/>
-                    <Button Content="保存" Click="SavePreset_Click"
-                            Style="{StaticResource ToolbarButton}"
-                            Margin="4,0,0,0"
-                            ToolTip="現在の有効/無効状態をプリセットとして保存"/>
-                    <Button Content="管理" Click="ManageButton_Click"
-                            Style="{StaticResource ToolbarButton}"
-                            Margin="4,0,0,0"
-                            ToolTip="プリセットの編集・削除"/>
+                    <Button Click="SavePreset_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="プリセット保存"
+                            Margin="4,0,0,0">
+                        <TextBlock Text="&#xE105;" Style="{StaticResource IconText}"/>
+                    </Button>
+                    <Button Click="ManageButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="プリセット管理">
+                        <TextBlock Text="&#xE713;" Style="{StaticResource IconText}"/>
+                    </Button>
                 </StackPanel>
             </Border>
 
             <!-- Filter Bar -->
-            <Border Grid.Row="3" Background="#1E1E2E" Padding="8,4">
+            <Border Grid.Row="2" Background="#1E1E2E" Padding="8,4">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <TextBlock Text="フィルター:" Foreground="#606068" FontSize="11"
                                VerticalAlignment="Center" Margin="0,0,6,0"/>
@@ -133,7 +128,7 @@
             </Border>
 
             <!-- Entry List -->
-            <ListView Grid.Row="4"
+            <ListView Grid.Row="3"
                       ItemsSource="{Binding FilteredEntries}"
                       SelectedItem="{Binding SelectedEntry}"
                       Background="#1E1E2E"
@@ -161,7 +156,7 @@
             </ListView>
 
             <!-- Status Bar -->
-            <Border Grid.Row="5" Background="#1A1A22" BorderBrush="#383840" BorderThickness="0,1,0,0">
+            <Border Grid.Row="4" Background="#1A1A22" BorderBrush="#383840" BorderThickness="0,1,0,0">
                 <DockPanel Margin="12,4">
                     <TextBlock Text="{Binding StatusText}"
                                FontSize="11" Foreground="#808090"

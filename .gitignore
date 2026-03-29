@@ -24,3 +24,4 @@ artifacts/
 .idea/
 *.resharper
 _ReSharper*/
+publish/

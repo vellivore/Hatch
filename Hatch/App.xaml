@@ -43,6 +43,47 @@
         <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#0078D4"/>
         <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#FFFFFF"/>
 
+        <!-- Icon text style for Segoe Fluent Icons -->
+        <Style x:Key="IconText" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Foreground" Value="#D0D0D4"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Toolbar icon button style -->
+        <Style x:Key="ToolbarIconButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="32"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="1,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                CornerRadius="3" Padding="4,2">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#32323A"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#3F3F46"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- ComboBox Style -->
         <Style TargetType="ComboBox">
             <Setter Property="Background" Value="#2D2D30"/>
