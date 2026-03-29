@@ -66,21 +66,41 @@
                      BorderBrush="#3F3F46"
                      SelectionBrush="#0078D4"/>
 
-            <!-- Group -->
+            <!-- Group (3-level hierarchy) -->
             <TextBlock Grid.Row="7" Text="グループ:" FontSize="12"
                        Foreground="#808090" Margin="0,0,0,4"/>
-            <ComboBox Grid.Row="8" x:Name="GroupComboBox"
-                      FontSize="13" Padding="6,5"
-                      Margin="0,0,0,16"
-                      IsEditable="True"
-                      Background="#2D2D30"
-                      Foreground="#E0E0E0"
-                      BorderBrush="#3F3F46">
-                <ComboBox.Resources>
-                    <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#2D2D30"/>
-                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#0078D4"/>
-                </ComboBox.Resources>
-            </ComboBox>
+            <Grid Grid.Row="8" Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="6"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="6"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <!-- Labels -->
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="大区分" FontSize="10"
+                           Foreground="#606068" Margin="0,0,0,2"/>
+                <TextBlock Grid.Row="0" Grid.Column="2" Text="中区分" FontSize="10"
+                           Foreground="#606068" Margin="0,0,0,2"/>
+                <TextBlock Grid.Row="0" Grid.Column="4" Text="小区分" FontSize="10"
+                           Foreground="#606068" Margin="0,0,0,2"/>
+                <!-- ComboBoxes -->
+                <ComboBox Grid.Row="1" Grid.Column="0" x:Name="Group1ComboBox"
+                          FontSize="12" IsEditable="True"
+                          Background="#2D2D30" Foreground="#E0E0E0" BorderBrush="#3F3F46"
+                          SelectionChanged="Group1_SelectionChanged"/>
+                <ComboBox Grid.Row="1" Grid.Column="2" x:Name="Group2ComboBox"
+                          FontSize="12" IsEditable="True"
+                          Background="#2D2D30" Foreground="#E0E0E0" BorderBrush="#3F3F46"
+                          SelectionChanged="Group2_SelectionChanged"/>
+                <ComboBox Grid.Row="1" Grid.Column="4" x:Name="Group3ComboBox"
+                          FontSize="12" IsEditable="True"
+                          Background="#2D2D30" Foreground="#E0E0E0" BorderBrush="#3F3F46"/>
+            </Grid>
         </Grid>
     </Border>
 </Window>

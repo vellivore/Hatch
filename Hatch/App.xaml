@@ -8,6 +8,8 @@
         <!-- Converters -->
         <local:InverseBoolConverter x:Key="InverseBoolConverter"/>
         <local:SystemEntryOpacityConverter x:Key="SystemEntryOpacityConverter"/>
+        <local:GroupColorConverter x:Key="GroupColorConverter"/>
+        <local:GroupDisplayConverter x:Key="GroupDisplayConverter"/>
 
         <!-- Color Palette -->
         <Color x:Key="BgColor">#1E1E2E</Color>

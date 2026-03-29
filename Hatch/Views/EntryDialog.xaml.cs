@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using Hatch.Models;
 
@@ -9,17 +10,18 @@ public partial class EntryDialog : Window
     public HostEntry? Result { get; private set; }
 
     private readonly HostEntry? _existing;
+    private readonly List<string> _allGroups;
+    private bool _suppressSelectionChanged;
 
     public EntryDialog(IEnumerable<string> groups, HostEntry? existing = null)
     {
         InitializeComponent();
 
         _existing = existing;
+        _allGroups = groups.Where(g => g != "すべて").ToList();
 
-        // グループドロップダウンに選択肢を追加
-        GroupComboBox.Items.Add("");
-        foreach (var g in groups.Where(g => g != "すべて"))
-            GroupComboBox.Items.Add(g);
+        // 大区分の候補を設定
+        RebuildGroup1();
 
         if (existing != null)
         {
@@ -28,26 +30,123 @@ public partial class EntryDialog : Window
             IpTextBox.Text = existing.IpAddress;
             HostnameTextBox.Text = existing.Hostname;
             CommentTextBox.Text = existing.Comment;
-            GroupComboBox.Text = existing.GroupName ?? "";
+
+            // 既存のグループ名を分解してセット
+            if (!string.IsNullOrEmpty(existing.GroupName))
+            {
+                var parts = existing.GroupName.Split('/', 3);
+                _suppressSelectionChanged = true;
+                if (parts.Length >= 1) Group1ComboBox.Text = parts[0];
+                RebuildGroup2();
+                if (parts.Length >= 2) Group2ComboBox.Text = parts[1];
+                RebuildGroup3();
+                if (parts.Length >= 3) Group3ComboBox.Text = parts[2];
+                _suppressSelectionChanged = false;
+            }
         }
         else
         {
             IpTextBox.Text = "127.0.0.1";
         }
 
-        // ボタンを追加（コードビハインドで生成してGrid末尾に配置）
         AddButtons();
-
         IpTextBox.Focus();
+    }
+
+    private void RebuildGroup1()
+    {
+        var items = _allGroups
+            .Select(g => g.Split('/')[0])
+            .Where(s => !string.IsNullOrEmpty(s))
+            .Distinct()
+            .OrderBy(s => s)
+            .ToList();
+
+        Group1ComboBox.Items.Clear();
+        Group1ComboBox.Items.Add("");
+        foreach (var item in items)
+            Group1ComboBox.Items.Add(item);
+    }
+
+    private void RebuildGroup2()
+    {
+        var g1 = Group1ComboBox.Text?.Trim() ?? "";
+        Group2ComboBox.Items.Clear();
+        Group2ComboBox.Items.Add("");
+        Group2ComboBox.Text = "";
+
+        if (string.IsNullOrEmpty(g1)) return;
+
+        var items = _allGroups
+            .Where(g => g.StartsWith(g1 + "/"))
+            .Select(g =>
+            {
+                var rest = g[(g1.Length + 1)..];
+                return rest.Split('/')[0];
+            })
+            .Where(s => !string.IsNullOrEmpty(s))
+            .Distinct()
+            .OrderBy(s => s)
+            .ToList();
+
+        foreach (var item in items)
+            Group2ComboBox.Items.Add(item);
+    }
+
+    private void RebuildGroup3()
+    {
+        var g1 = Group1ComboBox.Text?.Trim() ?? "";
+        var g2 = Group2ComboBox.Text?.Trim() ?? "";
+        Group3ComboBox.Items.Clear();
+        Group3ComboBox.Items.Add("");
+        Group3ComboBox.Text = "";
+
+        if (string.IsNullOrEmpty(g1) || string.IsNullOrEmpty(g2)) return;
+
+        var prefix = $"{g1}/{g2}/";
+        var items = _allGroups
+            .Where(g => g.StartsWith(prefix))
+            .Select(g => g[prefix.Length..].Split('/')[0])
+            .Where(s => !string.IsNullOrEmpty(s))
+            .Distinct()
+            .OrderBy(s => s)
+            .ToList();
+
+        foreach (var item in items)
+            Group3ComboBox.Items.Add(item);
+    }
+
+    private void Group1_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressSelectionChanged) return;
+        RebuildGroup2();
+        RebuildGroup3();
+    }
+
+    private void Group2_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressSelectionChanged) return;
+        RebuildGroup3();
+    }
+
+    private string BuildGroupName()
+    {
+        var g1 = Group1ComboBox.Text?.Trim() ?? "";
+        var g2 = Group2ComboBox.Text?.Trim() ?? "";
+        var g3 = Group3ComboBox.Text?.Trim() ?? "";
+
+        if (string.IsNullOrEmpty(g1)) return "";
+        if (string.IsNullOrEmpty(g2)) return g1;
+        if (string.IsNullOrEmpty(g3)) return $"{g1}/{g2}";
+        return $"{g1}/{g2}/{g3}";
     }
 
     private void AddButtons()
     {
-        var panel = new System.Windows.Controls.StackPanel
+        var panel = new StackPanel
         {
             Orientation = System.Windows.Controls.Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 0, 0, 0),
         };
 
         var okButton = new System.Windows.Controls.Button
@@ -85,9 +184,8 @@ public partial class EntryDialog : Window
         panel.Children.Add(okButton);
         panel.Children.Add(cancelButton);
 
-        // Grid の最後に追加
         var grid = (System.Windows.Controls.Grid)((System.Windows.Controls.Border)Content).Child;
-        grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = System.Windows.GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         System.Windows.Controls.Grid.SetRow(panel, grid.RowDefinitions.Count - 1);
         grid.Children.Add(panel);
     }
@@ -104,12 +202,14 @@ public partial class EntryDialog : Window
             return;
         }
 
+        var groupName = BuildGroupName();
+
         Result = new HostEntry
         {
             IpAddress = ip,
             Hostname = hostname,
             Comment = CommentTextBox.Text.Trim(),
-            GroupName = string.IsNullOrWhiteSpace(GroupComboBox.Text) ? null : GroupComboBox.Text.Trim(),
+            GroupName = string.IsNullOrEmpty(groupName) ? null : groupName,
             IsEnabled = _existing?.IsEnabled ?? true,
         };
 

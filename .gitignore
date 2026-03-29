@@ -27,3 +27,5 @@ _ReSharper*/
 publish/
 
 icons/output/
+publish-single/
+*.zip

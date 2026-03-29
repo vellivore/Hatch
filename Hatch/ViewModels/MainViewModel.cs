@@ -448,9 +448,20 @@ public partial class MainViewModel : ObservableObject
                 groupSet.Add(e.GroupName);
         }
 
+        // 親階層も自動追加（業務/案件A/環境A → 業務, 業務/案件A も追加）
+        var withParents = new SortedSet<string>(groupSet);
+        foreach (var g in groupSet)
+        {
+            var parts = g.Split('/');
+            for (int i = 1; i < parts.Length; i++)
+            {
+                withParents.Add(string.Join("/", parts.Take(i)));
+            }
+        }
+
         Groups.Clear();
         Groups.Add("すべて");
-        foreach (var g in groupSet)
+        foreach (var g in withParents)
             Groups.Add(g);
 
         if (!Groups.Contains(SelectedGroup))
@@ -471,8 +482,12 @@ public partial class MainViewModel : ObservableObject
         }
         else
         {
+            // 親階層を選んだ場合は配下も表示（前方一致）
+            var prefix = SelectedGroup + "/";
             FilteredEntries = new ObservableCollection<HostEntry>(
-                Entries.Where(e => !e.IsRawLine && e.GroupName == SelectedGroup));
+                Entries.Where(e => !e.IsRawLine &&
+                    (e.GroupName == SelectedGroup ||
+                     (e.GroupName != null && e.GroupName.StartsWith(prefix)))));
         }
         UpdateStatus();
     }

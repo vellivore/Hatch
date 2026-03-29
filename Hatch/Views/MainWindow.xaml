@@ -119,10 +119,16 @@
                                VerticalAlignment="Center" Margin="0,0,6,0"/>
                     <ComboBox ItemsSource="{Binding Groups}"
                               SelectedItem="{Binding SelectedGroup}"
-                              Width="140" FontSize="11"
+                              Width="220" FontSize="11"
                               VerticalAlignment="Center"
                               Background="#2D2D30" Foreground="#E0E0E0"
                               BorderBrush="#3F3F46">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Converter={StaticResource GroupDisplayConverter}}"
+                                           FontFamily="Consolas" FontSize="11"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
                     </ComboBox>
                 </StackPanel>
             </Border>
@@ -147,9 +153,19 @@
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
+                        <GridViewColumn Width="120" Header="グループ">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border Background="{Binding GroupName, Converter={StaticResource GroupColorConverter}}"
+                                            CornerRadius="3" Padding="4,1" Margin="-4,-1">
+                                        <TextBlock Text="{Binding GroupName}" FontSize="11"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                    </Border>
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
                         <GridViewColumn Width="150" Header="IPアドレス" DisplayMemberBinding="{Binding IpAddress}"/>
                         <GridViewColumn Width="220" Header="ホスト名" DisplayMemberBinding="{Binding Hostname}"/>
-                        <GridViewColumn Width="100" Header="グループ" DisplayMemberBinding="{Binding GroupName}"/>
                         <GridViewColumn Width="200" Header="コメント" DisplayMemberBinding="{Binding Comment}"/>
                     </GridView>
                 </ListView.View>
