@@ -1,0 +1,173 @@
+<Window x:Class="Hatch.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Hatch.ViewModels"
+        Title="Hatch" Height="560" Width="900"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize">
+
+    <Window.DataContext>
+        <vm:MainViewModel/>
+    </Window.DataContext>
+
+    <Window.InputBindings>
+        <KeyBinding Key="S" Modifiers="Control" Command="{Binding ApplyCommand}"/>
+        <KeyBinding Key="F5" Command="{Binding ReloadCommand}"/>
+    </Window.InputBindings>
+
+    <Border Background="#1E1E2E" CornerRadius="8" BorderBrush="#383840" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="32"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Custom Title Bar -->
+            <Grid Grid.Row="0" Background="#1A1A22" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                    <TextBlock Text="Hatch" Foreground="#D4D4D4" FontSize="13" FontWeight="SemiBold"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Text=" - hosts ファイル管理" Foreground="#808090" FontSize="11"
+                               VerticalAlignment="Center" Margin="4,1,0,0"/>
+                </StackPanel>
+
+                <!-- Window Controls -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0">
+                    <Button Content="&#x2715;" Click="CloseButton_Click"
+                            Width="40" Height="28"
+                            Background="Transparent" Foreground="#808080"
+                            BorderThickness="0" FontSize="12" Cursor="Hand"
+                            ToolTip="トレイに格納"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- Toolbar Row 1: Entry operations + File -->
+            <Border Grid.Row="1" Background="#24242C" BorderBrush="#383840" BorderThickness="0,0,0,0"
+                    Padding="8,4">
+                <DockPanel>
+                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                        <Button Content="追加" Click="AddButton_Click"
+                                Style="{StaticResource ToolbarButton}"
+                                Margin="0,0,4,0"/>
+                        <Button Content="編集" Click="EditButton_Click"
+                                Style="{StaticResource ToolbarButton}"
+                                Margin="0,0,4,0"/>
+                        <Button Content="削除" Command="{Binding DeleteCommand}"
+                                Style="{StaticResource ToolbarButton}"
+                                Margin="0,0,12,0"/>
+
+                        <Border Width="1" Background="#383840" Margin="0,2,12,2"/>
+
+                        <Button Content="最新化" Command="{Binding ReloadCommand}"
+                                Style="{StaticResource ToolbarButton}"
+                                Margin="0,0,4,0"/>
+                        <Button Content="適用" Command="{Binding ApplyCommand}"
+                                Style="{StaticResource ToolbarButton}"
+                                Margin="0,0,12,0"/>
+
+                        <Border Width="1" Background="#383840" Margin="0,2,12,2"/>
+
+                        <Button Content="テキスト編集" Click="TextEditorButton_Click"
+                                Style="{StaticResource ToolbarButton}"
+                                Margin="0,0,4,0"
+                                ToolTip="hostsファイルをテキストとして直接編集"/>
+                        <Button Content="バックアップ" Click="BackupButton_Click"
+                                Style="{StaticResource ToolbarButton}"
+                                Margin="0,0,4,0"
+                                ToolTip="現在のhostsファイルをバックアップ"/>
+                        <Button Content="リストア" Click="RestoreButton_Click"
+                                Style="{StaticResource ToolbarButton}"
+                                ToolTip="バックアップからhostsファイルを復元"/>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- Toolbar Row 2: Preset -->
+            <Border Grid.Row="2" Background="#24242C" BorderBrush="#383840" BorderThickness="0,0,0,1"
+                    Padding="8,3">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="プリセット:" Foreground="#808090" FontSize="12"
+                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox ItemsSource="{Binding PresetNames}"
+                              SelectedItem="{Binding SelectedPresetName}"
+                              Width="150" FontSize="12"
+                              VerticalAlignment="Center"
+                              Background="#2D2D30" Foreground="#E0E0E0"
+                              BorderBrush="#3F3F46"/>
+                    <Button Content="保存" Click="SavePreset_Click"
+                            Style="{StaticResource ToolbarButton}"
+                            Margin="4,0,0,0"
+                            ToolTip="現在の有効/無効状態をプリセットとして保存"/>
+                    <Button Content="管理" Click="ManageButton_Click"
+                            Style="{StaticResource ToolbarButton}"
+                            Margin="4,0,0,0"
+                            ToolTip="プリセットの編集・削除"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Filter Bar -->
+            <Border Grid.Row="3" Background="#1E1E2E" Padding="8,4">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <TextBlock Text="フィルター:" Foreground="#606068" FontSize="11"
+                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox ItemsSource="{Binding Groups}"
+                              SelectedItem="{Binding SelectedGroup}"
+                              Width="140" FontSize="11"
+                              VerticalAlignment="Center"
+                              Background="#2D2D30" Foreground="#E0E0E0"
+                              BorderBrush="#3F3F46">
+                    </ComboBox>
+                </StackPanel>
+            </Border>
+
+            <!-- Entry List -->
+            <ListView Grid.Row="4"
+                      ItemsSource="{Binding FilteredEntries}"
+                      SelectedItem="{Binding SelectedEntry}"
+                      Background="#1E1E2E"
+                      Foreground="#E0E0E0"
+                      BorderThickness="0"
+                      MouseDoubleClick="ListView_MouseDoubleClick">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Width="50" Header="有効">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                                              IsEnabled="{Binding IsSystem, Converter={StaticResource InverseBoolConverter}}"
+                                              HorizontalAlignment="Center"
+                                              Click="CheckBox_Click"/>
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                        <GridViewColumn Width="150" Header="IPアドレス" DisplayMemberBinding="{Binding IpAddress}"/>
+                        <GridViewColumn Width="220" Header="ホスト名" DisplayMemberBinding="{Binding Hostname}"/>
+                        <GridViewColumn Width="100" Header="グループ" DisplayMemberBinding="{Binding GroupName}"/>
+                        <GridViewColumn Width="200" Header="コメント" DisplayMemberBinding="{Binding Comment}"/>
+                    </GridView>
+                </ListView.View>
+            </ListView>
+
+            <!-- Status Bar -->
+            <Border Grid.Row="5" Background="#1A1A22" BorderBrush="#383840" BorderThickness="0,1,0,0">
+                <DockPanel Margin="12,4">
+                    <TextBlock Text="{Binding StatusText}"
+                               FontSize="11" Foreground="#808090"
+                               VerticalAlignment="Center"/>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

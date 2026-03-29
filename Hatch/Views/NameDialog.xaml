@@ -1,0 +1,36 @@
+<Window x:Class="Hatch.Views.NameDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="プリセット保存"
+        Width="380" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="#1E1E2E"
+        Foreground="#E0E0E0">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="プリセット名:" Margin="0,0,0,8" FontSize="13"
+                   Foreground="#E0E0E0"/>
+
+        <TextBox Grid.Row="1" x:Name="NameTextBox"
+                 FontSize="13" Padding="4,4" Margin="0,0,0,12"
+                 Background="#2D2D30" Foreground="#E0E0E0"
+                 CaretBrush="#E0E0E0" BorderBrush="#3F3F46"
+                 SelectionBrush="#0078D4"/>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="保存" Width="80" Height="28" Margin="0,0,8,0"
+                    IsDefault="True" Click="OK_Click"
+                    Background="#0078D4" Foreground="White" BorderBrush="#0078D4"/>
+            <Button Content="キャンセル" Width="80" Height="28"
+                    IsCancel="True"
+                    Background="#3F3F46" Foreground="#E0E0E0" BorderBrush="#3F3F46"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,26 @@
+## .NET
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.userprefs
+*.sln.docstates
+
+## Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+
+## NuGet
+*.nupkg
+**/packages/*
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+## IDE
+.idea/
+*.resharper
+_ReSharper*/
