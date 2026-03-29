@@ -1,0 +1,20 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- C: ネットワークノード（白基調） -->
+  <!-- 角丸四角ベース -->
+  <rect x="24" y="24" width="208" height="208" rx="40" fill="#F5F5F5" stroke="#D0D0D0" stroke-width="2" />
+  <!-- 接続線 -->
+  <line x1="128" y1="74" x2="128" y2="104" stroke="#A0A0A0" stroke-width="4" />
+  <line x1="146" y1="144" x2="178" y2="170" stroke="#A0A0A0" stroke-width="4" />
+  <line x1="110" y1="144" x2="78" y2="170" stroke="#A0A0A0" stroke-width="4" />
+  <!-- 中央ノード -->
+  <circle cx="128" cy="128" r="24" fill="#707070" />
+  <!-- 上ノード -->
+  <circle cx="128" cy="60" r="14" fill="#909090" />
+  <!-- 右下ノード -->
+  <circle cx="190" cy="180" r="14" fill="#909090" />
+  <!-- 左下ノード -->
+  <circle cx="66" cy="180" r="14" fill="#909090" />
+  <!-- 切り替え矢印 -->
+  <path d="M140 120 A20 20 0 1 1 120 108" stroke="#505050" stroke-width="3.5" fill="none" stroke-linecap="round" />
+  <path d="M117 100 L120 110 L110 107" fill="#505050" />
+</svg>

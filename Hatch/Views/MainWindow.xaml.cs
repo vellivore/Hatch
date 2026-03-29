@@ -36,7 +36,7 @@ public partial class MainWindow : Window
     {
         _notifyIcon = new WinForms.NotifyIcon
         {
-            Icon = System.Drawing.SystemIcons.Application,
+            Icon = LoadAppIcon(),
             Visible = true,
             Text = $"Hatch - {ViewModel.ActivePresetDisplayName}",
         };
@@ -113,6 +113,21 @@ public partial class MainWindow : Window
         menu.Items.Add(exitItem);
 
         _notifyIcon.ContextMenuStrip = menu;
+    }
+
+    private static System.Drawing.Icon LoadAppIcon()
+    {
+        try
+        {
+            var exePath = Environment.ProcessPath;
+            if (exePath != null)
+            {
+                var icon = System.Drawing.Icon.ExtractAssociatedIcon(exePath);
+                if (icon != null) return icon;
+            }
+        }
+        catch { }
+        return System.Drawing.SystemIcons.Application;
     }
 
     private void ShowWindow()

@@ -25,3 +25,5 @@ artifacts/
 *.resharper
 _ReSharper*/
 publish/
+
+icons/output/
