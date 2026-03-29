@@ -473,22 +473,64 @@ public partial class MainViewModel : ObservableObject
         ApplyFilter();
     }
 
+    // --- Sort ---
+    private string _sortColumn = "";
+    private bool _sortAscending = true;
+
+    public string SortColumn => _sortColumn;
+    public bool SortAscending => _sortAscending;
+
+    public void SortByColumn(string column)
+    {
+        if (_sortColumn == column)
+            _sortAscending = !_sortAscending;
+        else
+        {
+            _sortColumn = column;
+            _sortAscending = true;
+        }
+        ApplyFilter();
+    }
+
+    private IEnumerable<HostEntry> ApplySortOrder(IEnumerable<HostEntry> items)
+    {
+        return _sortColumn switch
+        {
+            "IsEnabled" => _sortAscending
+                ? items.OrderByDescending(e => e.IsEnabled)
+                : items.OrderBy(e => e.IsEnabled),
+            "GroupName" => _sortAscending
+                ? items.OrderBy(e => e.GroupName ?? "", StringComparer.OrdinalIgnoreCase)
+                : items.OrderByDescending(e => e.GroupName ?? "", StringComparer.OrdinalIgnoreCase),
+            "IpAddress" => _sortAscending
+                ? items.OrderBy(e => e.IpAddress, StringComparer.OrdinalIgnoreCase)
+                : items.OrderByDescending(e => e.IpAddress, StringComparer.OrdinalIgnoreCase),
+            "Hostname" => _sortAscending
+                ? items.OrderBy(e => e.Hostname, StringComparer.OrdinalIgnoreCase)
+                : items.OrderByDescending(e => e.Hostname, StringComparer.OrdinalIgnoreCase),
+            _ => items
+        };
+    }
+
     private void ApplyFilter()
     {
+        IEnumerable<HostEntry> filtered;
         if (SelectedGroup == "すべて")
         {
-            FilteredEntries = new ObservableCollection<HostEntry>(
-                Entries.Where(e => !e.IsRawLine));
+            filtered = Entries.Where(e => !e.IsRawLine);
         }
         else
         {
-            // 親階層を選んだ場合は配下も表示（前方一致）
             var prefix = SelectedGroup + "/";
-            FilteredEntries = new ObservableCollection<HostEntry>(
-                Entries.Where(e => !e.IsRawLine &&
-                    (e.GroupName == SelectedGroup ||
-                     (e.GroupName != null && e.GroupName.StartsWith(prefix)))));
+            filtered = Entries.Where(e => !e.IsRawLine &&
+                (e.GroupName == SelectedGroup ||
+                 (e.GroupName != null && e.GroupName.StartsWith(prefix))));
         }
+
+        if (!string.IsNullOrEmpty(_sortColumn))
+            filtered = ApplySortOrder(filtered);
+
+        FilteredEntries = new ObservableCollection<HostEntry>(filtered);
         UpdateStatus();
     }
 

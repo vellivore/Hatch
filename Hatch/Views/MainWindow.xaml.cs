@@ -12,9 +12,19 @@ public partial class MainWindow : Window
     private MainViewModel ViewModel => (MainViewModel)DataContext;
     private WinForms.NotifyIcon? _notifyIcon;
 
+    // Column header → sort property mapping
+    private static readonly Dictionary<string, string> ColumnMap = new()
+    {
+        { "有効", "IsEnabled" },
+        { "グループ", "GroupName" },
+        { "IPアドレス", "IpAddress" },
+        { "ホスト名", "Hostname" },
+    };
+
     public MainWindow()
     {
         InitializeComponent();
+        AddHandler(GridViewColumnHeader.ClickEvent, new RoutedEventHandler(ColumnHeader_Click));
 
         Loaded += (_, _) =>
         {
@@ -29,6 +39,39 @@ public partial class MainWindow : Window
 
             InitializeNotifyIcon();
         };
+    }
+
+    private void ColumnHeader_Click(object sender, RoutedEventArgs e)
+    {
+        if (e.OriginalSource is not GridViewColumnHeader header) return;
+        if (header.Role == GridViewColumnHeaderRole.Padding) return;
+        if (header.Column == null) return;
+
+        // グループ列はフィルター用ComboBoxなのでソートしない
+        if (header.Column.Header is System.Windows.Controls.ComboBox) return;
+
+        var headerText = (header.Column.Header?.ToString() ?? "").TrimEnd(' ', '^', 'v');
+        if (!ColumnMap.TryGetValue(headerText, out var sortProperty)) return;
+
+        ViewModel.SortByColumn(sortProperty);
+        UpdateSortIndicators();
+    }
+
+    private void UpdateSortIndicators()
+    {
+        var gridView = EntryListView.View as GridView;
+        if (gridView == null) return;
+
+        foreach (var col in gridView.Columns)
+        {
+            var text = (col.Header?.ToString() ?? "").TrimEnd(' ', '^', 'v');
+            if (!ColumnMap.TryGetValue(text, out var prop)) continue;
+
+            if (prop == ViewModel.SortColumn)
+                col.Header = $"{text} {(ViewModel.SortAscending ? "^" : "v")}";
+            else
+                col.Header = text;
+        }
     }
 
     // --- System Tray ---
@@ -176,6 +219,13 @@ public partial class MainWindow : Window
 
     private void ListView_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
+        // 列ヘッダーのダブルクリックは無視（ソート操作）
+        var hitElement = e.OriginalSource as DependencyObject;
+        while (hitElement != null)
+        {
+            if (hitElement is GridViewColumnHeader) return;
+            hitElement = System.Windows.Media.VisualTreeHelper.GetParent(hitElement);
+        }
         EditSelectedEntry();
     }
 

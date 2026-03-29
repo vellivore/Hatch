@@ -23,7 +23,6 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="32"/>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
@@ -56,85 +55,65 @@
             <!-- Toolbar -->
             <Border Grid.Row="1" Background="#24242C" BorderBrush="#383840" BorderThickness="0,0,0,1"
                     Padding="4,3">
-                <StackPanel Orientation="Horizontal">
-                    <!-- Entry CRUD -->
-                    <Button Click="AddButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="追加">
-                        <TextBlock Text="&#xE710;" Style="{StaticResource IconText}"/>
-                    </Button>
-                    <Button Click="EditButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="編集">
-                        <TextBlock Text="&#xE70F;" Style="{StaticResource IconText}"/>
-                    </Button>
-                    <Button Command="{Binding DeleteCommand}" Style="{StaticResource ToolbarIconButton}" ToolTip="削除">
-                        <TextBlock Text="&#xE74D;" Style="{StaticResource IconText}"/>
-                    </Button>
+                <DockPanel>
+                    <!-- Preset (右寄せ) -->
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <TextBlock Text="&#xE74E;" FontFamily="Segoe Fluent Icons" FontSize="13"
+                                   Foreground="#808090" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <ComboBox ItemsSource="{Binding PresetNames}"
+                                  SelectedItem="{Binding SelectedPresetName}"
+                                  Width="150" FontSize="12"
+                                  VerticalAlignment="Center"
+                                  Background="#2D2D30" Foreground="#E0E0E0"
+                                  BorderBrush="#3F3F46"/>
+                        <Button Click="SavePreset_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="プリセット保存"
+                                Margin="4,0,0,0">
+                            <TextBlock Text="&#xE105;" Style="{StaticResource IconText}"/>
+                        </Button>
+                        <Button Click="ManageButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="プリセット管理">
+                            <TextBlock Text="&#xE713;" Style="{StaticResource IconText}"/>
+                        </Button>
+                    </StackPanel>
 
-                    <Border Width="1" Background="#383840" Margin="6,4,6,4"/>
+                    <!-- Left: Entry operations -->
+                    <StackPanel Orientation="Horizontal">
+                        <Button Click="AddButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="追加">
+                            <TextBlock Text="&#xE710;" Style="{StaticResource IconText}"/>
+                        </Button>
+                        <Button Click="EditButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="編集">
+                            <TextBlock Text="&#xE70F;" Style="{StaticResource IconText}"/>
+                        </Button>
+                        <Button Command="{Binding DeleteCommand}" Style="{StaticResource ToolbarIconButton}" ToolTip="削除">
+                            <TextBlock Text="&#xE74D;" Style="{StaticResource IconText}"/>
+                        </Button>
 
-                    <!-- File operations -->
-                    <Button Command="{Binding ReloadCommand}" Style="{StaticResource ToolbarIconButton}" ToolTip="最新化 (F5)">
-                        <TextBlock Text="&#xE72C;" Style="{StaticResource IconText}"/>
-                    </Button>
-                    <Button Command="{Binding ApplyCommand}" Style="{StaticResource ToolbarIconButton}" ToolTip="適用 (Ctrl+S)">
-                        <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}"/>
-                    </Button>
+                        <Border Width="1" Background="#383840" Margin="6,4,6,4"/>
 
-                    <Border Width="1" Background="#383840" Margin="6,4,6,4"/>
+                        <Button Command="{Binding ReloadCommand}" Style="{StaticResource ToolbarIconButton}" ToolTip="最新化 (F5)">
+                            <TextBlock Text="&#xE72C;" Style="{StaticResource IconText}"/>
+                        </Button>
+                        <Button Command="{Binding ApplyCommand}" Style="{StaticResource ToolbarIconButton}" ToolTip="適用 (Ctrl+S)">
+                            <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}"/>
+                        </Button>
 
-                    <!-- Text editor / Backup / Restore -->
-                    <Button Click="TextEditorButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="テキスト編集">
-                        <TextBlock Text="&#xE7C5;" Style="{StaticResource IconText}"/>
-                    </Button>
-                    <Button Click="BackupButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="バックアップ">
-                        <TextBlock Text="&#xE78C;" Style="{StaticResource IconText}"/>
-                    </Button>
-                    <Button Click="RestoreButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="リストア">
-                        <TextBlock Text="&#xE7AC;" Style="{StaticResource IconText}"/>
-                    </Button>
+                        <Border Width="1" Background="#383840" Margin="6,4,6,4"/>
 
-                    <Border Width="1" Background="#383840" Margin="6,4,6,4"/>
-
-                    <!-- Preset -->
-                    <TextBlock Text="&#xE74E;" FontFamily="Segoe Fluent Icons" FontSize="13"
-                               Foreground="#808090" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                    <ComboBox ItemsSource="{Binding PresetNames}"
-                              SelectedItem="{Binding SelectedPresetName}"
-                              Width="150" FontSize="12"
-                              VerticalAlignment="Center"
-                              Background="#2D2D30" Foreground="#E0E0E0"
-                              BorderBrush="#3F3F46"/>
-                    <Button Click="SavePreset_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="プリセット保存"
-                            Margin="4,0,0,0">
-                        <TextBlock Text="&#xE105;" Style="{StaticResource IconText}"/>
-                    </Button>
-                    <Button Click="ManageButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="プリセット管理">
-                        <TextBlock Text="&#xE713;" Style="{StaticResource IconText}"/>
-                    </Button>
-                </StackPanel>
-            </Border>
-
-            <!-- Filter Bar -->
-            <Border Grid.Row="2" Background="#1E1E2E" Padding="8,4">
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <TextBlock Text="フィルター:" Foreground="#606068" FontSize="11"
-                               VerticalAlignment="Center" Margin="0,0,6,0"/>
-                    <ComboBox ItemsSource="{Binding Groups}"
-                              SelectedItem="{Binding SelectedGroup}"
-                              Width="220" FontSize="11"
-                              VerticalAlignment="Center"
-                              Background="#2D2D30" Foreground="#E0E0E0"
-                              BorderBrush="#3F3F46">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding Converter={StaticResource GroupDisplayConverter}}"
-                                           FontFamily="Consolas" FontSize="11"/>
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
-                </StackPanel>
+                        <Button Click="TextEditorButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="テキスト編集">
+                            <TextBlock Text="&#xE7C5;" Style="{StaticResource IconText}"/>
+                        </Button>
+                        <Button Click="BackupButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="バックアップ">
+                            <TextBlock Text="&#xE78C;" Style="{StaticResource IconText}"/>
+                        </Button>
+                        <Button Click="RestoreButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="リストア">
+                            <TextBlock Text="&#xE7AC;" Style="{StaticResource IconText}"/>
+                        </Button>
+                    </StackPanel>
+                </DockPanel>
             </Border>
 
             <!-- Entry List -->
-            <ListView Grid.Row="3"
+            <ListView Grid.Row="2"
+                      x:Name="EntryListView"
                       ItemsSource="{Binding FilteredEntries}"
                       SelectedItem="{Binding SelectedEntry}"
                       Background="#1E1E2E"
@@ -153,7 +132,21 @@
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
-                        <GridViewColumn Width="120" Header="グループ">
+                        <GridViewColumn Width="120">
+                            <GridViewColumn.Header>
+                                <ComboBox ItemsSource="{Binding DataContext.Groups, RelativeSource={RelativeSource AncestorType=ListView}}"
+                                          SelectedItem="{Binding DataContext.SelectedGroup, RelativeSource={RelativeSource AncestorType=ListView}}"
+                                          FontSize="11" MinWidth="100"
+                                          Background="Transparent" Foreground="#808090"
+                                          BorderThickness="0">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Converter={StaticResource GroupDisplayConverter}}"
+                                                       FontSize="11"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </GridViewColumn.Header>
                             <GridViewColumn.CellTemplate>
                                 <DataTemplate>
                                     <Border Background="{Binding GroupName, Converter={StaticResource GroupColorConverter}}"
@@ -172,7 +165,7 @@
             </ListView>
 
             <!-- Status Bar -->
-            <Border Grid.Row="4" Background="#1A1A22" BorderBrush="#383840" BorderThickness="0,1,0,0">
+            <Border Grid.Row="3" Background="#1A1A22" BorderBrush="#383840" BorderThickness="0,1,0,0">
                 <DockPanel Margin="12,4">
                     <TextBlock Text="{Binding StatusText}"
                                FontSize="11" Foreground="#808090"
