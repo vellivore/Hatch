@@ -37,6 +37,10 @@ public partial class MainWindow : Window
             Width = s.WindowWidth;
             Height = s.WindowHeight;
 
+            var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+            var versionStr = version != null ? $"v{version.Major}.{version.Minor}.{version.Build}" : "";
+            TitleText.Text = $"Hatch {versionStr}";
+
             InitializeNotifyIcon();
         };
     }

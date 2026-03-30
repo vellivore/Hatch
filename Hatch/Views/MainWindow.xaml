@@ -35,7 +35,7 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
-                    <TextBlock Text="Hatch" Foreground="#D4D4D4" FontSize="13" FontWeight="SemiBold"
+                    <TextBlock x:Name="TitleText" Text="Hatch" Foreground="#D4D4D4" FontSize="13" FontWeight="SemiBold"
                                VerticalAlignment="Center"/>
                     <TextBlock Text=" - hosts ファイル管理" Foreground="#808090" FontSize="11"
                                VerticalAlignment="Center" Margin="4,1,0,0"/>
