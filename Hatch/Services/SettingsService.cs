@@ -13,6 +13,9 @@ public class SettingsService
     {
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        // WindowLeft/Top の未設定番兵に double.NaN を使うため、NaN を "NaN" として
+        // 読み書きできるようにする（既定では NaN/Infinity は例外になり保存が落ちる）
+        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
     };
 
     public AppSettings Load()
