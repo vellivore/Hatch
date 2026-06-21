@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Globalization;
+using System.Security.Principal;
 using System.Threading;
 using System.Windows;
 using System.Windows.Data;
@@ -15,6 +17,20 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        // hosts 書込には管理者権限が必須。非昇格で起動された場合は
+        // UAC で自身を昇格起動し直し、このインスタンスは終了する。
+        // （単一ファイル publish ではマニフェストの requireAdministrator が
+        //   効かない場合があるため、コードで確実に昇格させる）
+        if (!IsRunningAsAdmin())
+        {
+            if (TryRelaunchAsAdmin())
+            {
+                Shutdown();
+                return;
+            }
+            // ユーザーが UAC を拒否 → 読み取り専用で続行（保存時に従来の警告）
+        }
+
         DispatcherUnhandledException += (_, args) =>
         {
             MessageBox.Show($"エラーが発生しました:\n\n{args.Exception}", "Hatch",
@@ -68,6 +84,46 @@ public partial class App : Application
         _mutex?.ReleaseMutex();
         _mutex?.Dispose();
         base.OnExit(e);
+    }
+
+    /// <summary>現在のプロセスが管理者として実行されているか。</summary>
+    private static bool IsRunningAsAdmin()
+    {
+        using var identity = WindowsIdentity.GetCurrent();
+        var principal = new WindowsPrincipal(identity);
+        return principal.IsInRole(WindowsBuiltInRole.Administrator);
+    }
+
+    /// <summary>
+    /// 自身を管理者権限で再起動する（UAC ダイアログ表示）。
+    /// 成功すれば true（呼び出し側は現インスタンスを終了する）。
+    /// UAC 拒否・失敗時は false。
+    /// </summary>
+    private static bool TryRelaunchAsAdmin()
+    {
+        // 単一ファイル publish では Environment.ProcessPath が apphost(.exe) を指す
+        var exePath = Environment.ProcessPath;
+        if (string.IsNullOrEmpty(exePath))
+            return false;
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = exePath,
+            UseShellExecute = true,
+            Verb = "runas",
+            WorkingDirectory = AppContext.BaseDirectory,
+        };
+
+        try
+        {
+            Process.Start(psi);
+            return true;
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            // ERROR_CANCELLED (1223) 等: ユーザーが UAC を拒否
+            return false;
+        }
     }
 }
 

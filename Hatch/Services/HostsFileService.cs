@@ -13,8 +13,10 @@ public class HostsFileService
                      "drivers", "etc", "hosts");
 
 
+    // IPv4 は各オクテット 0-255 に限定（999.x.x.x 等の不正値を弾く）。IPv6 は緩め。
+    private const string Ipv4Octet = @"(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)";
     private static readonly Regex EntryPattern =
-        new(@"^(?<disabled>#\s*)?(?<ip>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[0-9a-fA-F]*:[0-9a-fA-F:]+)\s+(?<hosts>.+)$");
+        new(@"^(?<disabled>#\s*)?(?<ip>" + Ipv4Octet + @"(?:\." + Ipv4Octet + @"){3}|[0-9a-fA-F]*:[0-9a-fA-F:]+)\s+(?<hosts>.+)$");
 
     public List<HostEntry> ReadHostsFile()
     {
@@ -73,12 +75,25 @@ public class HostsFileService
                     Hostname = hostname,
                     IsEnabled = !disabled,
                     Comment = comment,
+                    IsSystem = IsSystemEntry(ip, hostname),
                 });
             }
         }
 
+        // 先頭の空行を除去（書き込み時に header 直後へ空行1行を必ず付与するため、
+        // ここで除去しないと保存のたびに空行が1行ずつ増殖する）
+        while (entries.Count > 0 && entries[0].IsRawLine && string.IsNullOrWhiteSpace(entries[0].RawText))
+            entries.RemoveAt(0);
+
         return entries;
     }
+
+    /// <summary>
+    /// localhost 等のシステム既定エントリかどうかを判定する（削除・無効化の保護対象）。
+    /// </summary>
+    private static bool IsSystemEntry(string ip, string hostname)
+        => (ip == "127.0.0.1" || ip == "::1")
+           && hostname.Equals("localhost", StringComparison.OrdinalIgnoreCase);
 
     public void WriteHostsFile(List<HostEntry> entries)
     {
@@ -123,24 +138,51 @@ public class HostsFileService
     public static string GetHostsPath() => HostsPath;
 
     /// <summary>
-    /// hosts ファイルのエンコーディングを検出する。BOM があれば UTF-8、なければシステムデフォルト。
+    /// hosts ファイルのエンコーディングを内容ベースで検出する。
+    /// BOM あり、またはバイト列が妥当な UTF-8 なら UTF-8（ASCII も妥当 UTF-8 なので無害）。
+    /// UTF-8 として不正な場合のみ CP932(Shift_JIS) にフォールバックする。
+    /// Hatch は常に UTF-8(BOM なし) で書き込むため、この判定で読み書きが往復一致する。
     /// </summary>
-    private static Encoding DetectEncoding()
+    private static Encoding DetectEncoding() => DetectEncoding(HostsPath);
+
+    private static Encoding DetectEncoding(string path)
     {
-        if (!File.Exists(HostsPath)) return Encoding.UTF8;
+        var utf8NoBom = new UTF8Encoding(false);
+        if (!File.Exists(path)) return utf8NoBom;
         try
         {
-            var bom = new byte[3];
-            using var fs = File.OpenRead(HostsPath);
-            fs.Read(bom, 0, 3);
-            if (bom[0] == 0xEF && bom[1] == 0xBB && bom[2] == 0xBF)
-                return Encoding.UTF8;
+            var bytes = File.ReadAllBytes(path);
+
+            // BOM あり → UTF-8
+            if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
+                return new UTF8Encoding(true);
+
+            // BOM なし: 妥当な UTF-8 として読めるか厳密判定（ASCII も妥当 UTF-8）
+            try
+            {
+                var strict = new UTF8Encoding(false, throwOnInvalidBytes: true);
+                strict.GetString(bytes);
+                return utf8NoBom;
+            }
+            catch (DecoderFallbackException)
+            {
+                // UTF-8 として不正 → 既存の Shift_JIS ファイルとみなす
+                Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+                return Encoding.GetEncoding(932);
+            }
         }
-        catch { }
-        // BOM なし → システムデフォルト（日本語環境では Shift_JIS）
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        return Encoding.GetEncoding(932);
+        catch
+        {
+            return utf8NoBom;
+        }
     }
+
+    /// <summary>
+    /// 任意ファイルをエンコーディング自動判定で読み込む（リストア用）。
+    /// 読み込みは StreamReader（File.ReadAllText）経由のため BOM は自動的に除去される。
+    /// </summary>
+    public static string ReadTextDetect(string path)
+        => File.ReadAllText(path, DetectEncoding(path));
 
     public bool CanWriteHostsFile()
     {

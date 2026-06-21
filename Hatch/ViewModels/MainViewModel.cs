@@ -559,13 +559,15 @@ public partial class MainViewModel : ObservableObject
     public void BackupHostsFile(string path)
     {
         var content = _hostsService.ReadHostsFileRaw();
-        System.IO.File.WriteAllText(path, content, System.Text.Encoding.UTF8);
+        // hosts と同じ UTF-8(BOM なし) で保存（Encoding.UTF8 は BOM を付与するため使わない）
+        System.IO.File.WriteAllText(path, content, new System.Text.UTF8Encoding(false));
         StatusText = $"バックアップを保存しました: {System.IO.Path.GetFileName(path)}";
     }
 
     public void RestoreHostsFile(string path)
     {
-        var content = System.IO.File.ReadAllText(path, System.Text.Encoding.UTF8);
+        // 外部ツール作成の Shift_JIS バックアップ等も自動判定で読み込む
+        var content = HostsFileService.ReadTextDetect(path);
         _hostsService.WriteHostsFileRaw(content);
         _hostsService.FlushDns();
         ReloadEntries();
