@@ -161,4 +161,23 @@ public class PresetJsonTests
         using var doc = JsonDocument.Parse(JsonSerializer.Serialize(preset));
         Assert.Equal(new[] { "Name", "EnabledGroups" }, doc.RootElement.EnumerateObject().Select(p => p.Name));
     }
+
+    [Fact]
+    public void Settings_SaveKeepsJapaneseReadable()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "hatch-test-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            var svc = new SettingsService(path);
+            var settings = new AppSettings { ActivePresetName = "環境A" };
+            settings.Presets.Add(new Preset { Name = "環境A", EnabledGroups = { "業務/案件A" } });
+            svc.Save(settings);
+            var json = File.ReadAllText(path);
+            Assert.Contains("環境A", json);
+            Assert.Contains("業務/案件A", json);
+            Assert.DoesNotContain(@"\u", json);
+            Assert.Equal("環境A", svc.Load().ActivePresetName);
+        }
+        finally { File.Delete(path); }
+    }
 }

@@ -14,6 +14,8 @@ public class SettingsService
     {
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        // 日本語のグループ名・プリセット名をエスケープせず、そのまま読める形で保存する
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.Create(System.Text.Unicode.UnicodeRanges.All),
     };
 
     /// <summary>設定ファイルのパス。</summary>
