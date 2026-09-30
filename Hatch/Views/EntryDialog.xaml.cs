@@ -50,7 +50,6 @@ public partial class EntryDialog : Window
             IpTextBox.Text = "127.0.0.1";
         }
 
-        AddButtons();
         IpTextBox.Focus();
     }
 
@@ -142,55 +141,6 @@ public partial class EntryDialog : Window
         return $"{g1}/{g2}/{g3}";
     }
 
-    private void AddButtons()
-    {
-        var panel = new StackPanel
-        {
-            Orientation = System.Windows.Controls.Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
-        };
-
-        var okButton = new System.Windows.Controls.Button
-        {
-            Content = "OK",
-            Width = 80,
-            Height = 30,
-            Background = new System.Windows.Media.SolidColorBrush(
-                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#0078D4")),
-            Foreground = System.Windows.Media.Brushes.White,
-            BorderBrush = new System.Windows.Media.SolidColorBrush(
-                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#0078D4")),
-            Margin = new Thickness(0, 0, 8, 0),
-            Cursor = Cursors.Hand,
-            FontSize = 13,
-        };
-        okButton.Click += OK_Click;
-
-        var cancelButton = new System.Windows.Controls.Button
-        {
-            Content = "キャンセル",
-            Width = 80,
-            Height = 30,
-            Background = new System.Windows.Media.SolidColorBrush(
-                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#3F3F46")),
-            Foreground = new System.Windows.Media.SolidColorBrush(
-                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#E0E0E0")),
-            BorderBrush = new System.Windows.Media.SolidColorBrush(
-                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#3F3F46")),
-            Cursor = Cursors.Hand,
-            FontSize = 13,
-        };
-        cancelButton.Click += Cancel_Click;
-
-        panel.Children.Add(okButton);
-        panel.Children.Add(cancelButton);
-
-        var grid = (System.Windows.Controls.Grid)((System.Windows.Controls.Border)Content).Child;
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        System.Windows.Controls.Grid.SetRow(panel, grid.RowDefinitions.Count - 1);
-        grid.Children.Add(panel);
-    }
-
     private void OK_Click(object sender, RoutedEventArgs e)
     {
         var ip = IpTextBox.Text.Trim();
@@ -217,12 +167,19 @@ public partial class EntryDialog : Window
         }
         if (!HostsDocument.IsValidComment(comment))
         {
-            Warn("コメントに # は使えません（hosts の行が壊れるため）。");
+            Warn("コメントに # は使えません（hosts の行が壊れるため）。\n" +
+                 "また、[ ] で囲んだ語で始めることもできません（グループのタグと区別できないため）。");
             CommentTextBox.Focus();
             return;
         }
 
         var groupName = BuildGroupName();
+        if (!HostsDocument.IsValidGroupName(groupName))
+        {
+            Warn("グループ名が正しくありません（# [ ] は使えず、/ の前後を空にもできません）。");
+            Group1ComboBox.Focus();
+            return;
+        }
 
         Result = new HostEntry
         {

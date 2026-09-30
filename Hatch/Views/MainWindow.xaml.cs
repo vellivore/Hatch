@@ -1,7 +1,9 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using System.Windows.Input;
-using Hatch.Models;
+using Hatch.Services;
 using Hatch.ViewModels;
 using WinForms = System.Windows.Forms;
 
@@ -29,10 +31,10 @@ public partial class MainWindow : Window
         Loaded += (_, _) =>
         {
             var s = ViewModel.Settings;
-            if (IsOnVirtualScreen(s.WindowLeft, s.WindowTop))
+            if (s.WindowLeft is double left && s.WindowTop is double top && IsOnVirtualScreen(left, top))
             {
-                Left = s.WindowLeft;
-                Top = s.WindowTop;
+                Left = left;
+                Top = top;
             }
             Width = s.WindowWidth;
             Height = s.WindowHeight;
@@ -51,7 +53,7 @@ public partial class MainWindow : Window
     /// </summary>
     private static bool IsOnVirtualScreen(double left, double top)
     {
-        if (double.IsNaN(left) || double.IsNaN(top)) return false;
+        if (!double.IsFinite(left) || !double.IsFinite(top)) return false;
         return left >= SystemParameters.VirtualScreenLeft
             && left < SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth
             && top >= SystemParameters.VirtualScreenTop
@@ -68,9 +70,30 @@ public partial class MainWindow : Window
             ? new Rect(Left, Top, Width, Height)
             : RestoreBounds;
         if (bounds.IsEmpty)
-            bounds = new Rect(double.NaN, double.NaN, Width, Height);
+        {
+            ViewModel.SaveSettings(null, null, Width, Height);
+            return;
+        }
         ViewModel.SaveSettings(bounds.Left, bounds.Top, bounds.Width, bounds.Height);
     }
+
+    // ==================== キーボード ====================
+
+    private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            TryApply();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.F5 && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            ReloadWithConfirm();
+            e.Handled = true;
+        }
+    }
+
+    // ==================== 並べ替え ====================
 
     private void ColumnHeader_Click(object sender, RoutedEventArgs e)
     {
@@ -105,14 +128,135 @@ public partial class MainWindow : Window
         }
     }
 
-    // --- System Tray ---
+    // ==================== 保存・最新化 ====================
+
+    private void ApplyButton_Click(object sender, RoutedEventArgs e) => TryApply();
+
+    private void ReloadButton_Click(object sender, RoutedEventArgs e) => ReloadWithConfirm();
+
+    /// <summary>一覧を hosts に保存する。権限がない・失敗したときはメッセージを出して false。</summary>
+    private bool TryApply()
+    {
+        if (!ViewModel.CanWrite)
+        {
+            MessageBox.Show(
+                "hostsファイルへの書き込み権限がありません。\n管理者として実行してください。",
+                "Hatch", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
+
+        try
+        {
+            ViewModel.Apply();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"書き込みエラー: {ex.Message}", "Hatch",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+            return false;
+        }
+    }
+
+    private void ReloadWithConfirm()
+    {
+        if (ViewModel.IsDirty)
+        {
+            var result = MessageBox.Show(
+                "未保存の変更があります。破棄して最新化しますか？",
+                "Hatch", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (result != MessageBoxResult.Yes)
+                return;
+        }
+        ViewModel.Reload();
+    }
+
+    // ==================== プリセット切替 ====================
+
+    /// <summary>
+    /// ComboBox で選ばれたときだけ切り替える。VM 側の値の変化（バインド経由の選択更新）は
+    /// VM の値と一致するので無視される。
+    /// </summary>
+    private void PresetComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (PresetComboBox.SelectedItem is not string selected) return;
+        if (selected == ViewModel.SelectedPresetName) return;
+
+        // ドロップダウンが閉じてから確認ダイアログを出す
+        Dispatcher.BeginInvoke(() => SwitchPresetFromWindow(selected));
+    }
+
+    private void SwitchPresetFromWindow(string presetName)
+    {
+        try
+        {
+            if (presetName == ViewModel.SelectedPresetName) return;
+
+            var result = ViewModel.SwitchPreset(presetName);
+            if (result == PresetSwitchResult.NeedsConfirmation)
+            {
+                var dialog = new ConfirmSwitchDialog(PresetLogic.DisplayName(presetName)) { Owner = this };
+                dialog.ShowDialog();
+                switch (dialog.Choice)
+                {
+                    case SwitchConfirmChoice.ApplyAndSwitch:
+                        if (!TryApply()) return;
+                        result = ViewModel.SwitchPreset(presetName, force: true);
+                        break;
+                    case SwitchConfirmChoice.DiscardAndSwitch:
+                        ViewModel.Reload();
+                        result = ViewModel.SwitchPreset(presetName, force: true);
+                        break;
+                    default:
+                        return;
+                }
+            }
+
+            if (result == PresetSwitchResult.Failed)
+            {
+                MessageBox.Show(ViewModel.StatusText, "Hatch", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        finally
+        {
+            // 取り消し・失敗時は ComboBox を VM の現在値に戻す（成功時も同じ値に揃うだけ）
+            SyncPresetComboBox();
+        }
+    }
+
+    private void SyncPresetComboBox()
+        => BindingOperations.GetBindingExpression(PresetComboBox, Selector.SelectedItemProperty)?.UpdateTarget();
+
+    /// <summary>トレイからの切替。未保存の変更があるときは確認できないので拒否してバルーンで知らせる。</summary>
+    private void SwitchPresetFromTray(string presetName)
+    {
+        if (ViewModel.IsDirty)
+        {
+            _notifyIcon?.ShowBalloonTip(
+                5000, "Hatch",
+                "一覧に未保存の変更があるため、プリセットを切り替えませんでした。\n" +
+                "ウィンドウを開いて適用するか、最新化で破棄してから切り替えてください。",
+                WinForms.ToolTipIcon.Warning);
+            return;
+        }
+
+        var result = ViewModel.SwitchPreset(presetName);
+        if (result == PresetSwitchResult.Failed)
+        {
+            _notifyIcon?.ShowBalloonTip(5000, "Hatch", ViewModel.StatusText, WinForms.ToolTipIcon.Error);
+        }
+        SyncPresetComboBox();
+    }
+
+    // ==================== タスクトレイ ====================
+
     private void InitializeNotifyIcon()
     {
         _notifyIcon = new WinForms.NotifyIcon
         {
             Icon = LoadAppIcon(),
             Visible = true,
-            Text = $"Hatch - {ViewModel.ActivePresetDisplayName}",
+            Text = TrayTooltip(),
         };
 
         _notifyIcon.DoubleClick += (_, _) => ShowWindow();
@@ -126,9 +270,16 @@ public partial class MainWindow : Window
             {
                 RebuildTrayMenu();
                 if (_notifyIcon != null)
-                    _notifyIcon.Text = $"Hatch - {ViewModel.ActivePresetDisplayName}";
+                    _notifyIcon.Text = TrayTooltip();
             }
         };
+    }
+
+    private string TrayTooltip()
+    {
+        // NotifyIcon.Text は 127 文字まで
+        var text = $"Hatch - {ViewModel.ActivePresetDisplayName}";
+        return text.Length > 127 ? text[..127] : text;
     }
 
     private void RebuildTrayMenu()
@@ -140,32 +291,26 @@ public partial class MainWindow : Window
         // プリセット一覧
         foreach (var name in ViewModel.PresetNames)
         {
-            if (name == "なし") continue;
+            if (name == PresetLogic.NoneName) continue;
 
             var item = new WinForms.ToolStripMenuItem(name)
             {
                 Checked = name == ViewModel.SelectedPresetName,
             };
             var presetName = name; // capture for lambda
-            item.Click += (_, _) =>
-            {
-                Dispatcher.Invoke(() => ViewModel.SwitchPreset(presetName));
-            };
+            item.Click += (_, _) => Dispatcher.Invoke(() => SwitchPresetFromTray(presetName));
             menu.Items.Add(item);
         }
 
         if (menu.Items.Count > 0)
             menu.Items.Add(new WinForms.ToolStripSeparator());
 
-        // "なし"
-        var noneItem = new WinForms.ToolStripMenuItem("なし")
+        // "すべて無効"
+        var noneItem = new WinForms.ToolStripMenuItem(PresetLogic.NoneDisplayName)
         {
-            Checked = ViewModel.SelectedPresetName == "なし",
+            Checked = ViewModel.SelectedPresetName == PresetLogic.NoneName,
         };
-        noneItem.Click += (_, _) =>
-        {
-            Dispatcher.Invoke(() => ViewModel.SwitchPreset("なし"));
-        };
+        noneItem.Click += (_, _) => Dispatcher.Invoke(() => SwitchPresetFromTray(PresetLogic.NoneName));
         menu.Items.Add(noneItem);
 
         menu.Items.Add(new WinForms.ToolStripSeparator());
@@ -198,7 +343,9 @@ public partial class MainWindow : Window
         });
         menu.Items.Add(exitItem);
 
+        var old = _notifyIcon.ContextMenuStrip;
         _notifyIcon.ContextMenuStrip = menu;
+        old?.Dispose();
     }
 
     private void RestoreLatestBackup()
@@ -218,7 +365,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var time = Services.HostsFileService.GetBackupTime(latest);
+        var time = HostsFileService.GetBackupTime(latest);
         var message = $"hosts を {time:yyyy/MM/dd HH:mm:ss} の状態に戻しますか？";
         if (ViewModel.IsDirty)
             message += "\n\n一覧の未保存の変更は破棄されます。";
@@ -266,7 +413,8 @@ public partial class MainWindow : Window
         }
     }
 
-    // --- Title Bar ---
+    // ==================== タイトルバー ====================
+
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         DragMove();
@@ -279,7 +427,8 @@ public partial class MainWindow : Window
         Hide();
     }
 
-    // --- Entry CRUD ---
+    // ==================== エントリ操作 ====================
+
     private void AddButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new EntryDialog(ViewModel.Groups) { Owner = this };
@@ -292,6 +441,19 @@ public partial class MainWindow : Window
     private void EditButton_Click(object sender, RoutedEventArgs e)
     {
         EditSelectedEntry();
+    }
+
+    private void DeleteButton_Click(object sender, RoutedEventArgs e)
+    {
+        var entry = ViewModel.SelectedEntry;
+        if (entry == null || entry.IsSystem || entry.IsRawLine)
+            return;
+
+        var result = MessageBox.Show(
+            $"{entry.Hostname} を削除しますか？",
+            "Hatch", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (result == MessageBoxResult.Yes)
+            ViewModel.DeleteEntry(entry);
     }
 
     private void ListView_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -318,6 +480,8 @@ public partial class MainWindow : Window
         }
     }
 
+    // ==================== プリセット保存・管理 ====================
+
     private void ManageButton_Click(object sender, RoutedEventArgs e)
     {
         var currentGroups = ViewModel.Groups.Where(g => g != "すべて").ToList();
@@ -336,11 +500,18 @@ public partial class MainWindow : Window
         var dialog = new NameDialog() { Owner = this };
         if (dialog.ShowDialog() == true)
         {
+            if (dialog.ResultName == PresetLogic.NoneName || dialog.ResultName == PresetLogic.NoneDisplayName)
+            {
+                MessageBox.Show($"「{dialog.ResultName}」はプリセット名に使えません。", "Hatch",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
             ViewModel.SaveCurrentStateAsPreset(dialog.ResultName);
         }
     }
 
-    // --- Text Editor ---
+    // ==================== テキスト編集 ====================
+
     private void TextEditorButton_Click(object sender, RoutedEventArgs e)
     {
         var content = ViewModel.ReadHostsRaw();
@@ -359,7 +530,8 @@ public partial class MainWindow : Window
         }
     }
 
-    // --- Backup / Restore ---
+    // ==================== バックアップ / リストア ====================
+
     private void BackupButton_Click(object sender, RoutedEventArgs e)
     {
         var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");

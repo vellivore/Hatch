@@ -89,6 +89,9 @@ public static class HostsDocument
                 continue;
             }
 
+            // 行末コメント先頭のタグ "[大/中/小]" をグループとして読む
+            var (group, userComment) = SplitGroupTag(comment);
+
             foreach (var hostname in hostnames)
             {
                 entries.Add(new HostEntry
@@ -96,7 +99,8 @@ public static class HostsDocument
                     IpAddress = ip,
                     Hostname = hostname,
                     IsEnabled = !disabled,
-                    Comment = comment,
+                    Comment = userComment,
+                    GroupName = group,
                     IsSystem = IsSystemEntry(ip, hostname),
                 });
             }
@@ -123,6 +127,36 @@ public static class HostsDocument
         if (tokens.Length == 1) return true;
         return tokens.All(t => t.Contains('.')
                                || t.Equals("localhost", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// 行末コメントを グループタグ と ユーザーコメント に分ける。
+    /// コメントが "[" で始まり "]" を含むとき、最初の "]" までの中身をグループ、残りをコメントとする。
+    /// "]" がない・中身が空のときはタグとみなさず、全体をコメントのまま返す。
+    /// </summary>
+    public static (string? Group, string Comment) SplitGroupTag(string comment)
+    {
+        if (comment.StartsWith('['))
+        {
+            var close = comment.IndexOf(']');
+            if (close > 0)
+            {
+                var group = comment[1..close].Trim();
+                if (group.Length > 0)
+                    return (group, comment[(close + 1)..].Trim());
+            }
+        }
+        return (null, comment);
+    }
+
+    /// <summary>グループタグとユーザーコメントから行末コメントを組み立てる（タグは常に先頭）。</summary>
+    public static string BuildTrailingComment(string? group, string? comment)
+    {
+        var hasGroup = !string.IsNullOrWhiteSpace(group);
+        var hasComment = !string.IsNullOrWhiteSpace(comment);
+        if (hasGroup && hasComment) return $"[{group!.Trim()}] {comment!.Trim()}";
+        if (hasGroup) return $"[{group!.Trim()}]";
+        return hasComment ? comment!.Trim() : string.Empty;
     }
 
     /// <summary>File.ReadAllLines と同じ規則で行に分割する（末尾改行の後に空行を作らない）。</summary>
@@ -163,8 +197,9 @@ public static class HostsDocument
                 ? $"{entry.IpAddress} {entry.Hostname}"
                 : $"# {entry.IpAddress} {entry.Hostname}";
 
-            if (!string.IsNullOrWhiteSpace(entry.Comment))
-                line += $" # {entry.Comment}";
+            var trailing = BuildTrailingComment(entry.GroupName, entry.Comment);
+            if (trailing.Length > 0)
+                line += $" # {trailing}";
 
             sb.Append(line).Append(NewLine);
         }
@@ -192,7 +227,28 @@ public static class HostsDocument
     public static bool IsValidHostname(string? hostname)
         => !string.IsNullOrEmpty(hostname) && HostnamePattern.IsMatch(hostname);
 
-    /// <summary>コメントが hosts の行を壊さないか（"#" を含むと次回の読み込みで分割がずれる）。</summary>
+    /// <summary>
+    /// コメントが hosts の行を壊さないか。"#" を含むと次回の読み込みで分割がずれ、
+    /// "[...]" で始まるとグループタグと区別できない。
+    /// </summary>
     public static bool IsValidComment(string? comment)
-        => comment == null || !comment.Contains('#');
+    {
+        if (string.IsNullOrEmpty(comment)) return true;
+        if (comment.Contains('#')) return false;
+        var trimmed = comment.TrimStart();
+        return !(trimmed.StartsWith('[') && trimmed.Contains(']'));
+    }
+
+    /// <summary>
+    /// グループ名がタグとして書けるか（null/空 = グループなし は可）。
+    /// "/" 区切りの各階層が空でなく、"#" "[" "]" を含まないこと。
+    /// </summary>
+    public static bool IsValidGroupName(string? group)
+    {
+        if (string.IsNullOrEmpty(group)) return true;
+        return group.Split('/').All(part =>
+            part.Length > 0
+            && part == part.Trim()
+            && part.IndexOfAny(new[] { '#', '[', ']' }) < 0);
+    }
 }

@@ -2,16 +2,31 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Net.Sockets;
-using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using Hatch.Models;
 using Hatch.Services;
 
 namespace Hatch.ViewModels;
 
+/// <summary>プリセット切替の結果。</summary>
+public enum PresetSwitchResult
+{
+    /// <summary>切り替えた（書込権限がある場合は hosts に保存済み）。</summary>
+    Switched,
+    /// <summary>未保存の変更があるため切り替えていない。呼び出し側で確認して force で呼び直す。</summary>
+    NeedsConfirmation,
+    /// <summary>プリセットが見つからない、または hosts への書き込みに失敗した（状態は元のまま）。</summary>
+    Failed,
+}
+
+/// <summary>
+/// 確認ダイアログは持たない（View 側の責務）。hosts への書き込みは
+/// <see cref="Apply"/> と <see cref="SwitchPreset"/>、テキスト編集・リストア系の明示メソッドだけが行う。
+/// </summary>
 public partial class MainViewModel : ObservableObject
 {
+    private const string AllGroups = "すべて";
+
     private readonly HostsFileService _hostsService = new();
     private readonly SettingsService _settingsService = new();
     private AppSettings _settings = new();
@@ -29,7 +44,7 @@ public partial class MainViewModel : ObservableObject
     private ObservableCollection<string> _groups = new();
 
     [ObservableProperty]
-    private string _selectedGroup = "すべて";
+    private string _selectedGroup = AllGroups;
 
     [ObservableProperty]
     private string _statusText = string.Empty;
@@ -46,102 +61,108 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private ObservableCollection<string> _presetNames = new();
 
+    /// <summary>
+    /// 現在のプリセット（番兵 "なし" = すべて無効）。変更しても hosts には書かない。
+    /// 切り替えは <see cref="SwitchPreset"/> を使う。
+    /// </summary>
     [ObservableProperty]
-    private string _selectedPresetName = "なし";
+    [NotifyPropertyChangedFor(nameof(ActivePresetDisplayName))]
+    private string _selectedPresetName = PresetLogic.NoneName;
 
     // 一括変更中（プリセット適用など）はエントリ単位の変更通知で状態を再計算しない
     private bool _bulkUpdate;
+
+    // 直近の hosts 読み込みが失敗した（一覧が空のまま書くと hosts を消してしまうので書き込みを拒否する）
+    private bool _loadFailed;
 
     public MainViewModel()
     {
         OnEntriesChanged(null, Entries);
         LoadSettings();
-        ReloadEntries();
         CanWrite = _hostsService.CanWriteHostsFile();
+        ReloadEntries();
     }
+
+    public AppSettings Settings => _settings;
+
+    public string SettingsPath => _settingsService.SettingsPath;
+
+    // ==================== 設定・プリセット ====================
 
     private void LoadSettings()
     {
         _settings = _settingsService.Load();
-        LoadPresets();
-    }
-
-    private void LoadPresets()
-    {
         Presets = new ObservableCollection<Preset>(_settings.Presets.Select(p => p.Clone()));
 
         // アクティブプリセットを復元（起動時は hosts に書かない）
         var active = !string.IsNullOrEmpty(_settings.ActivePresetName)
             && Presets.Any(p => p.Name == _settings.ActivePresetName)
             ? _settings.ActivePresetName!
-            : "なし";
+            : PresetLogic.NoneName;
         RebuildPresetNames(active);
     }
 
-    private void SavePresets()
+    private void SavePresetsToSettings()
     {
         _settings.Presets = Presets.Select(p => p.Clone()).ToList();
-        _settings.ActivePresetName = SelectedPresetName == "なし" ? null : SelectedPresetName;
+        _settings.ActivePresetName = SelectedPresetName == PresetLogic.NoneName ? null : SelectedPresetName;
+    }
+
+    private void SaveSettingsFile()
+    {
+        SavePresetsToSettings();
+        _settingsService.Save(_settings);
     }
 
     /// <summary>
     /// ComboBox の項目を作り直し、選択を <paramref name="selected"/> に合わせる。
-    /// PresetNames.Clear() の時点で ComboBox が TwoWay バインド経由で SelectedPresetName に
-    /// null を押し込むため、作り直しの間はプリセット適用（hosts 書込）を抑止する。
+    /// （ComboBox は OneWay バインドなので、Clear() で選択が外れても VM の値は null にならない）
     /// </summary>
     private void RebuildPresetNames(string selected)
     {
-        _suppressPresetApply = true;
-        try
-        {
-            PresetNames.Clear();
-            PresetNames.Add("なし");
-            foreach (var p in Presets)
-                PresetNames.Add(p.Name);
+        PresetNames.Clear();
+        PresetNames.Add(PresetLogic.NoneName);
+        foreach (var p in Presets)
+            PresetNames.Add(p.Name);
 
-            SelectedPresetName = PresetNames.Contains(selected) ? selected : "なし";
-        }
-        finally
-        {
-            _suppressPresetApply = false;
-        }
+        SelectedPresetName = PresetNames.Contains(selected) ? selected : PresetLogic.NoneName;
+        // Clear() で ComboBox の選択が外れるため、値が変わっていなくても通知して選択を戻させる
+        OnPropertyChanged(nameof(SelectedPresetName));
         OnPropertyChanged(nameof(PresetNames));
     }
 
     /// <summary>
-    /// プリセット管理ダイアログの結果を反映する。
-    /// 有効プリセットが削除されたときだけ「なし」を適用する。それ以外（変更なし・名前変更・
-    /// グループ構成の変更）では有効プリセットを変えず、hosts にも書き込まない。
+    /// プリセット管理ダイアログの結果を反映する。有効プリセットの名前変更には追従する。
+    /// 有効プリセットが削除された場合は選択を「すべて無効」に戻すが、hosts には書かない
+    /// （書き込みは明示的な切替・適用だけが行う）。削除されたら true。
     /// </summary>
-    public void UpdatePresets(List<Preset> newPresets, IReadOnlyDictionary<string, string> renames)
+    public bool UpdatePresets(List<Preset> newPresets, IReadOnlyDictionary<string, string> renames)
     {
-        var previous = string.IsNullOrEmpty(SelectedPresetName) ? "なし" : SelectedPresetName;
-        var target = previous != "なし" && renames.TryGetValue(previous, out var renamed)
+        var previous = string.IsNullOrEmpty(SelectedPresetName) ? PresetLogic.NoneName : SelectedPresetName;
+        var target = previous != PresetLogic.NoneName && renames.TryGetValue(previous, out var renamed)
             ? renamed
             : previous;
 
         Presets = new ObservableCollection<Preset>(newPresets);
-        var activeDeleted = target != "なし" && !Presets.Any(p => p.Name == target);
-        RebuildPresetNames(activeDeleted ? "なし" : target);
-
-        SavePresets();
-        _settingsService.Save(_settings);
+        var activeDeleted = target != PresetLogic.NoneName && !Presets.Any(p => p.Name == target);
+        RebuildPresetNames(activeDeleted ? PresetLogic.NoneName : target);
+        SaveSettingsFile();
 
         if (activeDeleted)
-            ApplyPreset("なし");
+            StatusText = $"有効だったプリセット「{previous}」を削除しました（hosts は変更していません）";
+        else
+            UpdateStatus();
+        return activeDeleted;
     }
 
+    /// <summary>
+    /// 現在の有効/無効状態をプリセットとして保存する（前方一致で重複するグループは親にまとめる）。
+    /// 現在の状態そのものなので、選択を合わせるだけで hosts には書かない。
+    /// </summary>
     public void SaveCurrentStateAsPreset(string name)
     {
-        // 現在有効なエントリのグループ名を収集
-        var enabledGroups = new HashSet<string>();
-        foreach (var entry in Entries)
-        {
-            if (!entry.IsRawLine && entry.IsEnabled && !string.IsNullOrEmpty(entry.GroupName))
-                enabledGroups.Add(entry.GroupName);
-        }
+        var enabledGroups = PresetLogic.CaptureEnabledGroups(Entries);
 
-        // 同名プリセットがあれば上書き
         var existing = Presets.FirstOrDefault(p => p.Name == name);
         if (existing != null)
         {
@@ -156,74 +177,69 @@ public partial class MainViewModel : ObservableObject
             });
         }
 
-        // 現在の状態をそのまま保存したので、選択を合わせるだけで hosts には書かない
         RebuildPresetNames(name);
-        SavePresets();
-        _settingsService.Save(_settings);
+        SaveSettingsFile();
         StatusText = $"プリセット「{name}」を保存しました";
     }
 
-    private bool _suppressPresetApply;
-
-    partial void OnSelectedPresetNameChanged(string value)
+    /// <summary>
+    /// プリセットを切り替える。プリセットで hosts に書き込むのはこのメソッドだけ。
+    /// 未保存の変更があり <paramref name="force"/> でなければ何もせず NeedsConfirmation を返す。
+    /// 書込権限がない場合はエントリだけ切り替えて未保存状態にする。
+    /// 書き込みに失敗した場合はエントリの状態を元に戻して Failed を返す（エラーは StatusText）。
+    /// </summary>
+    public PresetSwitchResult SwitchPreset(string presetName, bool force = false)
     {
-        // 項目の作り直し中に ComboBox が押し込む null / 復元値では適用しない
-        if (_suppressPresetApply || string.IsNullOrEmpty(value)) return;
-        ApplyPreset(value);
-    }
+        if (IsDirty && !force)
+            return PresetSwitchResult.NeedsConfirmation;
 
-    private void ApplyPreset(string presetName)
-    {
-        // エントリ未読み込み時はスキップ（起動時の初期化順序）
-        if (Entries.Count == 0) return;
+        IReadOnlyCollection<string>? groups = null;
+        if (presetName != PresetLogic.NoneName)
+        {
+            var preset = Presets.FirstOrDefault(p => p.Name == presetName);
+            if (preset == null)
+            {
+                StatusText = $"プリセット「{presetName}」が見つかりません";
+                return PresetSwitchResult.Failed;
+            }
+            groups = preset.EnabledGroups.ToList();
+        }
+
+        var snapshot = Entries.Where(e => !e.IsRawLine).ToDictionary(e => e, e => e.IsEnabled);
+        var wasDirty = IsDirty;
 
         _bulkUpdate = true;
         try
         {
-            if (presetName == "なし")
-            {
-                // 「なし」を選択 = グループ付きエントリをすべて無効化
-                foreach (var entry in Entries)
-                {
-                    if (!entry.IsRawLine && !entry.IsSystem && !string.IsNullOrEmpty(entry.GroupName))
-                        entry.IsEnabled = false;
-                }
-            }
-            else
-            {
-                var preset = Presets.FirstOrDefault(p => p.Name == presetName);
-                if (preset == null) return;
-
-                foreach (var entry in Entries)
-                {
-                    if (entry.IsRawLine || entry.IsSystem || string.IsNullOrEmpty(entry.GroupName))
-                        continue;
-
-                    entry.IsEnabled = preset.EnabledGroups.Contains(entry.GroupName);
-                }
-            }
+            PresetLogic.Apply(Entries, groups);
         }
         finally
         {
             _bulkUpdate = false;
         }
 
-        // hosts ファイルに書き込み + DNS フラッシュ
         if (CanWrite)
         {
             try
             {
-                _hostsService.WriteHostsFile(Entries.ToList());
-                _hostsService.FlushDns();
-                SaveGroupAssignments();
-                SavePresets();
-                _settingsService.Save(_settings);
-                IsDirty = false;
+                WriteEntriesToHosts();
             }
             catch (Exception ex)
             {
+                _bulkUpdate = true;
+                try
+                {
+                    foreach (var (entry, enabled) in snapshot)
+                        entry.IsEnabled = enabled;
+                }
+                finally
+                {
+                    _bulkUpdate = false;
+                }
+                IsDirty = wasDirty;
+                ApplyFilter();
                 StatusText = $"プリセット適用エラー: {ex.Message}";
-                return;
+                return PresetSwitchResult.Failed;
             }
         }
         else
@@ -231,8 +247,127 @@ public partial class MainViewModel : ObservableObject
             IsDirty = true;
         }
 
+        SelectedPresetName = presetName;
+        SaveSettingsFile();
         ApplyFilter();
+        return PresetSwitchResult.Switched;
+    }
+
+    /// <summary>トレイ・ツールチップ用の表示名（番兵は「すべて無効」）。</summary>
+    public string ActivePresetDisplayName => PresetLogic.DisplayName(SelectedPresetName);
+
+    // ==================== 旧設定からの移行 ====================
+
+    /// <summary>移行待ちの旧形式グループ割り当てがあるか。</summary>
+    public bool HasPendingMigration => _settings.GroupAssignments is { Count: > 0 };
+
+    /// <summary>
+    /// v1.x の GroupAssignments（"IP|ホスト名"）を、タグのないエントリに当てはめる。当てはめた件数を返す。
+    /// 設定からは消さない（hosts への書き込みが成功した時点で消す）。
+    /// </summary>
+    private int ApplyLegacyGroupAssignments()
+        => HasPendingMigration ? LegacyGroupMigration.Apply(Entries, _settings.GroupAssignments) : 0;
+
+    /// <summary>エントリ（タグ付き）を hosts に書けたので、旧形式の割り当てを設定から消す。</summary>
+    private void CompleteMigration()
+    {
+        if (_settings.GroupAssignments == null) return;
+        _settings.GroupAssignments = null;
+        SaveSettingsFile();
+    }
+
+    // ==================== hosts の読み書き ====================
+
+    /// <summary>一覧のエントリを hosts に書き、DNS をフラッシュする（移行も完了させる）。</summary>
+    private void WriteEntriesToHosts()
+    {
+        if (_loadFailed)
+            throw new InvalidOperationException("hosts の読み込みに失敗しているため書き込みません。最新化してから操作してください。");
+        _hostsService.WriteHostsFile(Entries.ToList());
+        _hostsService.FlushDns();
+        IsDirty = false;
+        CompleteMigration();
+    }
+
+    /// <summary>hosts を読み直す（未保存の変更は破棄される。確認は View 側）。</summary>
+    public void Reload() => ReloadEntries();
+
+    private void ReloadEntries()
+    {
+        try
+        {
+            var entries = _hostsService.ReadHostsFile();
+            Entries = new ObservableCollection<HostEntry>(entries);
+            _loadFailed = false;
+            var migrated = ApplyLegacyGroupAssignments();
+            RebuildGroups();
+            ApplyFilter();
+            IsDirty = migrated > 0;
+            if (migrated > 0)
+                StatusText = "旧設定からグループを移行しました。適用で hosts に保存されます";
+        }
+        catch (Exception ex)
+        {
+            _loadFailed = true;
+            StatusText = $"読み込みエラー: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// 一覧を hosts に保存する。書込権限の確認とエラー表示は View 側（失敗時は例外）。
+    /// </summary>
+    public void Apply()
+    {
+        if (!CanWrite)
+            throw new InvalidOperationException("hostsファイルへの書き込み権限がありません。");
+
+        WriteEntriesToHosts();
+        SaveSettingsFile();
         UpdateStatus();
+        StatusText = "hostsファイルに保存しました (DNS キャッシュをフラッシュ済み)";
+    }
+
+    // ==================== エントリ操作 ====================
+
+    public void DeleteEntry(HostEntry entry)
+    {
+        if (entry.IsSystem || entry.IsRawLine) return;
+        if (!Entries.Remove(entry)) return;
+        RebuildGroups();
+        ApplyFilter();
+        IsDirty = true;
+    }
+
+    public void AddEntry(HostEntry entry)
+    {
+        // 最後のエントリの後に追加（末尾のコメント・空行より前）
+        var insertIdx = 0;
+        for (var i = Entries.Count - 1; i >= 0; i--)
+        {
+            if (!Entries[i].IsRawLine)
+            {
+                insertIdx = i + 1;
+                break;
+            }
+        }
+        Entries.Insert(insertIdx, entry);
+        RebuildGroups();
+        ApplyFilter();
+        IsDirty = true;
+    }
+
+    public void UpdateEntry(HostEntry original, HostEntry updated)
+    {
+        var idx = Entries.IndexOf(original);
+        if (idx < 0) return;
+
+        original.IpAddress = updated.IpAddress;
+        original.Hostname = updated.Hostname;
+        original.Comment = updated.Comment;
+        original.GroupName = updated.GroupName;
+        RebuildGroups();
+        ApplyFilter();
+        IsDirty = true;
     }
 
     // --- エントリの変更追跡 ---
@@ -273,211 +408,29 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    public AppSettings Settings => _settings;
-
-    public void SaveSettings(double left, double top, double width, double height)
-    {
-        _settings.WindowLeft = left;
-        _settings.WindowTop = top;
-        _settings.WindowWidth = width;
-        _settings.WindowHeight = height;
-        SaveGroupAssignments();
-        SavePresets();
-        _settingsService.Save(_settings);
-    }
-
-    private void SaveGroupAssignments()
-    {
-        _settings.GroupAssignments.Clear();
-        foreach (var entry in Entries)
-        {
-            if (entry.IsRawLine || entry.IsSystem || string.IsNullOrEmpty(entry.GroupName))
-                continue;
-
-            if (!_settings.GroupAssignments.ContainsKey(entry.GroupName))
-                _settings.GroupAssignments[entry.GroupName] = new List<string>();
-
-            var key = $"{entry.IpAddress}|{entry.Hostname}";
-            if (!_settings.GroupAssignments[entry.GroupName].Contains(key))
-                _settings.GroupAssignments[entry.GroupName].Add(key);
-        }
-    }
-
-    private void ApplyGroupAssignments()
-    {
-        foreach (var (group, keys) in _settings.GroupAssignments)
-        {
-            foreach (var key in keys)
-            {
-                var parts = key.Split('|', 2);
-                if (parts.Length != 2) continue;
-
-                var entry = Entries.FirstOrDefault(e =>
-                    !e.IsRawLine && e.IpAddress == parts[0] && e.Hostname == parts[1]);
-                if (entry != null)
-                    entry.GroupName = group;
-            }
-        }
-    }
-
-    [RelayCommand]
-    private void Reload()
-    {
-        if (IsDirty)
-        {
-            var result = MessageBox.Show(
-                "未保存の変更があります。破棄して最新化しますか？",
-                "Hatch",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-            if (result != MessageBoxResult.Yes)
-                return;
-        }
-        ReloadEntries();
-    }
-
-    private void ReloadEntries()
-    {
-        try
-        {
-            var entries = _hostsService.ReadHostsFile();
-            Entries = new ObservableCollection<HostEntry>(entries);
-            ApplyGroupAssignments();
-            RebuildGroups();
-            ApplyFilter();
-            UpdateStatus();
-            IsDirty = false;
-        }
-        catch (Exception ex)
-        {
-            StatusText = $"読み込みエラー: {ex.Message}";
-        }
-    }
-
-    [RelayCommand]
-    private void Apply()
-    {
-        if (!CanWrite)
-        {
-            MessageBox.Show(
-                "hostsファイルへの書き込み権限がありません。\n管理者として実行してください。",
-                "Hatch",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            return;
-        }
-
-        try
-        {
-            _hostsService.WriteHostsFile(Entries.ToList());
-            _hostsService.FlushDns();
-            SaveGroupAssignments();
-            _settingsService.Save(_settings);
-            IsDirty = false;
-            StatusText = "hostsファイルに保存しました (DNS キャッシュをフラッシュ済み)";
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"書き込みエラー: {ex.Message}",
-                "Hatch",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
-        }
-    }
-
-    [RelayCommand]
-    private void Delete()
-    {
-        if (SelectedEntry == null || SelectedEntry.IsSystem || SelectedEntry.IsRawLine)
-            return;
-
-        var result = MessageBox.Show(
-            $"{SelectedEntry.Hostname} を削除しますか？",
-            "Hatch",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-
-        if (result == MessageBoxResult.Yes)
-        {
-            Entries.Remove(SelectedEntry);
-            RebuildGroups();
-            ApplyFilter();
-            UpdateStatus();
-            IsDirty = true;
-        }
-    }
-
-    public void AddEntry(HostEntry entry)
-    {
-        // システムエントリの後に追加
-        var insertIdx = 0;
-        for (var i = Entries.Count - 1; i >= 0; i--)
-        {
-            if (!Entries[i].IsRawLine)
-            {
-                insertIdx = i + 1;
-                break;
-            }
-        }
-        Entries.Insert(insertIdx, entry);
-        RebuildGroups();
-        ApplyFilter();
-        UpdateStatus();
-        IsDirty = true;
-    }
-
-    public void UpdateEntry(HostEntry original, HostEntry updated)
-    {
-        var idx = Entries.IndexOf(original);
-        if (idx < 0) return;
-
-        original.IpAddress = updated.IpAddress;
-        original.Hostname = updated.Hostname;
-        original.Comment = updated.Comment;
-        original.GroupName = updated.GroupName;
-        RebuildGroups();
-        ApplyFilter();
-        IsDirty = true;
-    }
-
-    public void ToggleEntry(HostEntry entry)
-    {
-        if (entry.IsSystem || entry.IsRawLine) return;
-        entry.IsEnabled = !entry.IsEnabled;
-        UpdateStatus();
-        IsDirty = true;
-    }
+    // ==================== グループ・フィルタ・並べ替え ====================
 
     private void RebuildGroups()
     {
-        var groupSet = new SortedSet<string>();
+        var groupSet = new HashSet<string>(StringComparer.Ordinal);
 
-        // エントリに割り当てられたグループ
         foreach (var e in Entries)
         {
-            if (!string.IsNullOrEmpty(e.GroupName))
-                groupSet.Add(e.GroupName);
-        }
+            if (string.IsNullOrEmpty(e.GroupName)) continue;
 
-        // 親階層も自動追加（業務/案件A/環境A → 業務, 業務/案件A も追加）
-        var withParents = new SortedSet<string>(groupSet);
-        foreach (var g in groupSet)
-        {
-            var parts = g.Split('/');
-            for (int i = 1; i < parts.Length; i++)
-            {
-                withParents.Add(string.Join("/", parts.Take(i)));
-            }
+            // 親階層も自動追加（業務/案件A/環境A → 業務, 業務/案件A も追加）
+            var parts = e.GroupName.Split('/');
+            for (var i = 1; i <= parts.Length; i++)
+                groupSet.Add(string.Join("/", parts.Take(i)));
         }
 
         Groups.Clear();
-        Groups.Add("すべて");
-        foreach (var g in withParents)
+        Groups.Add(AllGroups);
+        foreach (var g in PresetLogic.OrderAsTree(groupSet))
             Groups.Add(g);
 
         if (!Groups.Contains(SelectedGroup))
-            SelectedGroup = "すべて";
+            SelectedGroup = AllGroups;
     }
 
     partial void OnSelectedGroupChanged(string value)
@@ -485,7 +438,6 @@ public partial class MainViewModel : ObservableObject
         ApplyFilter();
     }
 
-    // --- Sort ---
     private string _sortColumn = "";
     private bool _sortAscending = true;
 
@@ -527,16 +479,14 @@ public partial class MainViewModel : ObservableObject
     private void ApplyFilter()
     {
         IEnumerable<HostEntry> filtered;
-        if (SelectedGroup == "すべて")
+        if (SelectedGroup == AllGroups || string.IsNullOrEmpty(SelectedGroup))
         {
             filtered = Entries.Where(e => !e.IsRawLine);
         }
         else
         {
-            var prefix = SelectedGroup + "/";
-            filtered = Entries.Where(e => !e.IsRawLine &&
-                (e.GroupName == SelectedGroup ||
-                 (e.GroupName != null && e.GroupName.StartsWith(prefix))));
+            filtered = Entries.Where(e => !e.IsRawLine
+                && e.GroupName != null && PresetLogic.IsSelfOrDescendant(e.GroupName, SelectedGroup));
         }
 
         if (!string.IsNullOrEmpty(_sortColumn))
@@ -551,8 +501,8 @@ public partial class MainViewModel : ObservableObject
         var conflicts = RecomputeConflicts();
         var total = Entries.Count(e => !e.IsRawLine);
         var enabled = Entries.Count(e => !e.IsRawLine && e.IsEnabled);
-        var groupText = SelectedGroup == "すべて" ? "" : $" | グループ: {SelectedGroup}";
-        var presetText = SelectedPresetName == "なし" ? "" : $" | プリセット: {SelectedPresetName}";
+        var groupText = SelectedGroup == AllGroups ? "" : $" | グループ: {SelectedGroup}";
+        var presetText = SelectedPresetName == PresetLogic.NoneName ? "" : $" | プリセット: {SelectedPresetName}";
         var writeText = CanWrite ? "" : " | 読み取り専用";
         var conflictText = conflicts > 0 ? $" | 競合: {conflicts}" : "";
         StatusText = $"エントリ: {enabled}/{total}{groupText}{presetText}{writeText}{conflictText}";
@@ -588,7 +538,19 @@ public partial class MainViewModel : ObservableObject
         return $"{family}|{entry.Hostname}";
     }
 
-    // --- Text Editor ---
+    // ==================== ウィンドウ設定 ====================
+
+    public void SaveSettings(double? left, double? top, double width, double height)
+    {
+        _settings.WindowLeft = left;
+        _settings.WindowTop = top;
+        _settings.WindowWidth = width;
+        _settings.WindowHeight = height;
+        SaveSettingsFile();
+    }
+
+    // ==================== テキスト編集・バックアップ ====================
+
     public string ReadHostsRaw() => _hostsService.ReadHostsFileRaw();
 
     public void WriteHostsRaw(string content)
@@ -599,7 +561,6 @@ public partial class MainViewModel : ObservableObject
         StatusText = "テキスト編集からhostsファイルを保存しました (DNS キャッシュをフラッシュ済み)";
     }
 
-    // --- Backup / Restore ---
     public void BackupHostsFile(string path)
     {
         var content = _hostsService.ReadHostsFileRaw();
@@ -618,7 +579,6 @@ public partial class MainViewModel : ObservableObject
         StatusText = "リストアが完了しました (DNS キャッシュをフラッシュ済み)";
     }
 
-    // --- 自動バックアップ ---
     public string BackupDirectory => _hostsService.BackupDirectory;
 
     /// <summary>最新の自動バックアップのパス（なければ null）。</summary>
@@ -637,14 +597,5 @@ public partial class MainViewModel : ObservableObject
         ReloadEntries();
         var time = HostsFileService.GetBackupTime(latest);
         StatusText = $"直前の状態に戻しました（{time:yyyy/MM/dd HH:mm:ss} の hosts） (DNS キャッシュをフラッシュ済み)";
-    }
-
-    // --- Tray support ---
-    public string ActivePresetDisplayName =>
-        SelectedPresetName == "なし" ? "プリセットなし" : SelectedPresetName;
-
-    public void SwitchPreset(string presetName)
-    {
-        SelectedPresetName = presetName;
     }
 }

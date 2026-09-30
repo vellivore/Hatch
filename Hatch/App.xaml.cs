@@ -317,3 +317,15 @@ public class GroupDisplayConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => throw new NotSupportedException();
 }
+
+/// <summary>
+/// プリセット名の表示用。内部の番兵 "なし" を「すべて無効」と表示する。
+/// </summary>
+public class PresetDisplayConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        => value is string name ? Hatch.Services.PresetLogic.DisplayName(name) : value ?? "";
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}

@@ -10,6 +10,7 @@
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
         <local:GroupColorConverter x:Key="GroupColorConverter"/>
         <local:GroupDisplayConverter x:Key="GroupDisplayConverter"/>
+        <local:PresetDisplayConverter x:Key="PresetDisplayConverter"/>
 
         <!-- Color Palette -->
         <Color x:Key="BgColor">#1E1E2E</Color>

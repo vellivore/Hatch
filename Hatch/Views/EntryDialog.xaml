@@ -22,6 +22,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <!-- Title -->
@@ -101,6 +102,18 @@
                           FontSize="12" IsEditable="True"
                           Background="#2D2D30" Foreground="#E0E0E0" BorderBrush="#3F3F46"/>
             </Grid>
+
+            <!-- Buttons -->
+            <StackPanel Grid.Row="9" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="OK" Click="OK_Click" IsDefault="True"
+                        Width="80" Height="30" Margin="0,0,8,0"
+                        Background="#0078D4" Foreground="White" BorderBrush="#0078D4"
+                        Cursor="Hand" FontSize="13"/>
+                <Button Content="キャンセル" Click="Cancel_Click" IsCancel="True"
+                        Width="80" Height="30"
+                        Background="#3F3F46" Foreground="#E0E0E0" BorderBrush="#3F3F46"
+                        Cursor="Hand" FontSize="13"/>
+            </StackPanel>
         </Grid>
     </Border>
 </Window>

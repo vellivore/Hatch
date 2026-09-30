@@ -7,16 +7,12 @@
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
-        ResizeMode="NoResize">
+        ResizeMode="NoResize"
+        PreviewKeyDown="Window_PreviewKeyDown">
 
     <Window.DataContext>
         <vm:MainViewModel/>
     </Window.DataContext>
-
-    <Window.InputBindings>
-        <KeyBinding Key="S" Modifiers="Control" Command="{Binding ApplyCommand}"/>
-        <KeyBinding Key="F5" Command="{Binding ReloadCommand}"/>
-    </Window.InputBindings>
 
     <Border Background="#1E1E2E" CornerRadius="8" BorderBrush="#383840" BorderThickness="1">
         <Grid>
@@ -60,12 +56,20 @@
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                         <TextBlock Text="&#xE74E;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13"
                                    Foreground="#808090" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                        <ComboBox ItemsSource="{Binding PresetNames}"
-                                  SelectedItem="{Binding SelectedPresetName}"
+                        <ComboBox x:Name="PresetComboBox"
+                                  ItemsSource="{Binding PresetNames}"
+                                  SelectedItem="{Binding SelectedPresetName, Mode=OneWay}"
+                                  SelectionChanged="PresetComboBox_SelectionChanged"
                                   Width="150" FontSize="12"
                                   VerticalAlignment="Center"
                                   Background="#2D2D30" Foreground="#E0E0E0"
-                                  BorderBrush="#3F3F46"/>
+                                  BorderBrush="#3F3F46">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Converter={StaticResource PresetDisplayConverter}}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
                         <Button Click="SavePreset_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="プリセット保存"
                                 Margin="4,0,0,0">
                             <TextBlock Text="&#xE105;" Style="{StaticResource IconText}"/>
@@ -83,16 +87,16 @@
                         <Button Click="EditButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="編集">
                             <TextBlock Text="&#xE70F;" Style="{StaticResource IconText}"/>
                         </Button>
-                        <Button Command="{Binding DeleteCommand}" Style="{StaticResource ToolbarIconButton}" ToolTip="削除">
+                        <Button Click="DeleteButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="削除">
                             <TextBlock Text="&#xE74D;" Style="{StaticResource IconText}"/>
                         </Button>
 
                         <Border Width="1" Background="#383840" Margin="6,4,6,4"/>
 
-                        <Button Command="{Binding ReloadCommand}" Style="{StaticResource ToolbarIconButton}" ToolTip="最新化 (F5)">
+                        <Button Click="ReloadButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="最新化 (F5)">
                             <TextBlock Text="&#xE72C;" Style="{StaticResource IconText}"/>
                         </Button>
-                        <Button Command="{Binding ApplyCommand}" Style="{StaticResource ToolbarIconButton}" ToolTip="適用 (Ctrl+S)">
+                        <Button Click="ApplyButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="適用 (Ctrl+S)">
                             <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}"/>
                         </Button>
 
