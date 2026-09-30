@@ -593,7 +593,7 @@ public partial class MainViewModel : ObservableObject
 
     public void WriteHostsRaw(string content)
     {
-        _hostsService.WriteHostsFileRaw(content);
+        _hostsService.WriteHostsText(content);
         _hostsService.FlushDns();
         ReloadEntries();
         StatusText = "テキスト編集からhostsファイルを保存しました (DNS キャッシュをフラッシュ済み)";
@@ -612,10 +612,31 @@ public partial class MainViewModel : ObservableObject
     {
         // 外部ツール作成の Shift_JIS バックアップ等も自動判定で読み込む
         var content = HostsFileService.ReadTextDetect(path);
-        _hostsService.WriteHostsFileRaw(content);
+        _hostsService.WriteHostsText(content);
         _hostsService.FlushDns();
         ReloadEntries();
         StatusText = "リストアが完了しました (DNS キャッシュをフラッシュ済み)";
+    }
+
+    // --- 自動バックアップ ---
+    public string BackupDirectory => _hostsService.BackupDirectory;
+
+    /// <summary>最新の自動バックアップのパス（なければ null）。</summary>
+    public string? LatestAutoBackup => _hostsService.GetLatestBackup();
+
+    /// <summary>
+    /// 最新の自動バックアップを hosts へ書き戻し、DNS をフラッシュして再読込する。
+    /// 書き戻す直前の状態も自動バックアップされるので、もう一度実行すれば元に戻せる。
+    /// </summary>
+    public void RestoreLatestBackup()
+    {
+        var latest = _hostsService.GetLatestBackup()
+            ?? throw new InvalidOperationException("自動バックアップがまだありません。");
+        _hostsService.RestoreBackup(latest);
+        _hostsService.FlushDns();
+        ReloadEntries();
+        var time = HostsFileService.GetBackupTime(latest);
+        StatusText = $"直前の状態に戻しました（{time:yyyy/MM/dd HH:mm:ss} の hosts） (DNS キャッシュをフラッシュ済み)";
     }
 
     // --- Tray support ---

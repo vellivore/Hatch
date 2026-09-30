@@ -170,6 +170,18 @@ public partial class MainWindow : Window
 
         menu.Items.Add(new WinForms.ToolStripSeparator());
 
+        // "直前の状態に戻す"（最新の自動バックアップを書き戻す）
+        var undoItem = new WinForms.ToolStripMenuItem("直前の状態に戻す")
+        {
+            Enabled = ViewModel.LatestAutoBackup != null,
+        };
+        undoItem.Click += (_, _) => Dispatcher.Invoke(RestoreLatestBackup);
+        menu.Items.Add(undoItem);
+        // 開くたびに有効/無効を最新にする（バックアップは書き込みのたびに増えるため）
+        menu.Opening += (_, _) => undoItem.Enabled = ViewModel.LatestAutoBackup != null;
+
+        menu.Items.Add(new WinForms.ToolStripSeparator());
+
         // "表示"
         var showItem = new WinForms.ToolStripMenuItem("表示");
         showItem.Click += (_, _) => Dispatcher.Invoke(ShowWindow);
@@ -187,6 +199,40 @@ public partial class MainWindow : Window
         menu.Items.Add(exitItem);
 
         _notifyIcon.ContextMenuStrip = menu;
+    }
+
+    private void RestoreLatestBackup()
+    {
+        if (!ViewModel.CanWrite)
+        {
+            MessageBox.Show("hostsファイルへの書き込み権限がありません。\n管理者として実行してください。",
+                "Hatch", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var latest = ViewModel.LatestAutoBackup;
+        if (latest == null)
+        {
+            MessageBox.Show("自動バックアップがまだありません。", "Hatch",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var time = Services.HostsFileService.GetBackupTime(latest);
+        var message = $"hosts を {time:yyyy/MM/dd HH:mm:ss} の状態に戻しますか？";
+        if (ViewModel.IsDirty)
+            message += "\n\n一覧の未保存の変更は破棄されます。";
+        if (MessageBox.Show(message, "Hatch", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            ViewModel.RestoreLatestBackup();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"復元エラー: {ex.Message}", "Hatch", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private static System.Drawing.Icon LoadAppIcon()
@@ -301,7 +347,15 @@ public partial class MainWindow : Window
         var dialog = new TextEditorDialog(content) { Owner = this };
         if (dialog.ShowDialog() == true && dialog.Saved)
         {
-            ViewModel.WriteHostsRaw(dialog.ResultText);
+            try
+            {
+                ViewModel.WriteHostsRaw(dialog.ResultText);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"書き込みエラー: {ex.Message}", "Hatch",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
     }
 
