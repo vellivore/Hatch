@@ -101,6 +101,12 @@ Hatch.exe --hosts .\test-hosts.txt --config .\test-config.json --no-elevate
 
 主なボタン・入力欄・一覧には UI Automation 用の `AutomationId` を付けています（例: `PresetComboBox`・`ApplyButton`・`EntryListView`・`SwitchDiscardButton`）。
 
+`tools/smoke/smoke.ps1` は、この指定で起動した Hatch を UI Automation で操作し、一時 hosts と一時設定に対して移行・プリセット切替・バックアップ世代・二重起動を確認します。
+
+```
+pwsh -File tools\smoke\smoke.ps1 -Exe .\publish\Hatch.exe
+```
+
 ## スクリーンショット
 
 ダークテーマ UI、グループ別の色タグで視認性を確保。
