@@ -1,4 +1,7 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
+using System.Net.Sockets;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -46,8 +49,12 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _selectedPresetName = "なし";
 
+    // 一括変更中（プリセット適用など）はエントリ単位の変更通知で状態を再計算しない
+    private bool _bulkUpdate;
+
     public MainViewModel()
     {
+        OnEntriesChanged(null, Entries);
         LoadSettings();
         ReloadEntries();
         CanWrite = _hostsService.CanWriteHostsFile();
@@ -170,27 +177,35 @@ public partial class MainViewModel : ObservableObject
         // エントリ未読み込み時はスキップ（起動時の初期化順序）
         if (Entries.Count == 0) return;
 
-        if (presetName == "なし")
+        _bulkUpdate = true;
+        try
         {
-            // 「なし」を選択 = グループ付きエントリをすべて無効化
-            foreach (var entry in Entries)
+            if (presetName == "なし")
             {
-                if (!entry.IsRawLine && !entry.IsSystem && !string.IsNullOrEmpty(entry.GroupName))
-                    entry.IsEnabled = false;
+                // 「なし」を選択 = グループ付きエントリをすべて無効化
+                foreach (var entry in Entries)
+                {
+                    if (!entry.IsRawLine && !entry.IsSystem && !string.IsNullOrEmpty(entry.GroupName))
+                        entry.IsEnabled = false;
+                }
+            }
+            else
+            {
+                var preset = Presets.FirstOrDefault(p => p.Name == presetName);
+                if (preset == null) return;
+
+                foreach (var entry in Entries)
+                {
+                    if (entry.IsRawLine || entry.IsSystem || string.IsNullOrEmpty(entry.GroupName))
+                        continue;
+
+                    entry.IsEnabled = preset.EnabledGroups.Contains(entry.GroupName);
+                }
             }
         }
-        else
+        finally
         {
-            var preset = Presets.FirstOrDefault(p => p.Name == presetName);
-            if (preset == null) return;
-
-            foreach (var entry in Entries)
-            {
-                if (entry.IsRawLine || entry.IsSystem || string.IsNullOrEmpty(entry.GroupName))
-                    continue;
-
-                entry.IsEnabled = preset.EnabledGroups.Contains(entry.GroupName);
-            }
+            _bulkUpdate = false;
         }
 
         // hosts ファイルに書き込み + DNS フラッシュ
@@ -218,6 +233,44 @@ public partial class MainViewModel : ObservableObject
 
         ApplyFilter();
         UpdateStatus();
+    }
+
+    // --- エントリの変更追跡 ---
+    partial void OnEntriesChanged(ObservableCollection<HostEntry>? oldValue, ObservableCollection<HostEntry> newValue)
+    {
+        if (oldValue != null)
+        {
+            oldValue.CollectionChanged -= Entries_CollectionChanged;
+            foreach (var entry in oldValue)
+                entry.PropertyChanged -= Entry_PropertyChanged;
+        }
+        newValue.CollectionChanged += Entries_CollectionChanged;
+        foreach (var entry in newValue)
+            entry.PropertyChanged += Entry_PropertyChanged;
+    }
+
+    private void Entries_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.OldItems != null)
+            foreach (HostEntry entry in e.OldItems)
+                entry.PropertyChanged -= Entry_PropertyChanged;
+        if (e.NewItems != null)
+            foreach (HostEntry entry in e.NewItems)
+                entry.PropertyChanged += Entry_PropertyChanged;
+    }
+
+    /// <summary>
+    /// 一覧のチェックボックスは TwoWay バインドで IsEnabled を直接書き換えるため、
+    /// ここで未保存フラグと競合表示を更新する。
+    /// </summary>
+    private void Entry_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (_bulkUpdate) return;
+        if (e.PropertyName == nameof(HostEntry.IsEnabled))
+        {
+            IsDirty = true;
+            UpdateStatus();
+        }
     }
 
     public AppSettings Settings => _settings;
@@ -495,12 +548,44 @@ public partial class MainViewModel : ObservableObject
 
     private void UpdateStatus()
     {
+        var conflicts = RecomputeConflicts();
         var total = Entries.Count(e => !e.IsRawLine);
         var enabled = Entries.Count(e => !e.IsRawLine && e.IsEnabled);
         var groupText = SelectedGroup == "すべて" ? "" : $" | グループ: {SelectedGroup}";
         var presetText = SelectedPresetName == "なし" ? "" : $" | プリセット: {SelectedPresetName}";
         var writeText = CanWrite ? "" : " | 読み取り専用";
-        StatusText = $"エントリ: {enabled}/{total}{groupText}{presetText}{writeText}";
+        var conflictText = conflicts > 0 ? $" | 競合: {conflicts}" : "";
+        StatusText = $"エントリ: {enabled}/{total}{groupText}{presetText}{writeText}{conflictText}";
+    }
+
+    /// <summary>
+    /// 同じホスト名が複数行で有効になっている行に HasConflict を立て、競合しているホスト名の数を返す。
+    /// IPv4 と IPv6 は別の問い合わせ（A / AAAA）に効くため、アドレス種別ごとに数える。
+    /// </summary>
+    private int RecomputeConflicts()
+    {
+        var conflicted = Entries
+            .Where(e => !e.IsRawLine && e.IsEnabled)
+            .GroupBy(ConflictKey, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var entry in Entries)
+        {
+            if (entry.IsRawLine) continue;
+            entry.HasConflict = entry.IsEnabled && conflicted.Contains(ConflictKey(entry));
+        }
+
+        return conflicted.Select(k => k[(k.IndexOf('|') + 1)..])
+                         .Distinct(StringComparer.OrdinalIgnoreCase)
+                         .Count();
+    }
+
+    private static string ConflictKey(HostEntry entry)
+    {
+        var family = entry.IpAddress.Contains(':') ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork;
+        return $"{family}|{entry.Hostname}";
     }
 
     // --- Text Editor ---

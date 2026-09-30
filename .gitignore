@@ -29,3 +29,6 @@ publish/
 icons/output/
 publish-single/
 *.zip
+
+## Tests
+TestResults/

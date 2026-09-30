@@ -37,6 +37,12 @@ public partial class HostEntry : ObservableObject
     [ObservableProperty]
     private string _rawText = string.Empty;
 
+    /// <summary>
+    /// 同じホスト名が別の行でも有効になっている（どちらが効くか紛らわしい）。表示専用で保存しない。
+    /// </summary>
+    [ObservableProperty]
+    private bool _hasConflict;
+
     public HostEntry Clone()
     {
         return new HostEntry

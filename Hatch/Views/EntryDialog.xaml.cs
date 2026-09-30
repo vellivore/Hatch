@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Hatch.Models;
+using Hatch.Services;
 
 namespace Hatch.Views;
 
@@ -195,10 +196,29 @@ public partial class EntryDialog : Window
         var ip = IpTextBox.Text.Trim();
         var hostname = HostnameTextBox.Text.Trim();
 
+        var comment = CommentTextBox.Text.Trim();
+
         if (string.IsNullOrEmpty(ip) || string.IsNullOrEmpty(hostname))
         {
-            MessageBox.Show("IPアドレスとホスト名は必須です。", "Hatch",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
+            Warn("IPアドレスとホスト名は必須です。");
+            return;
+        }
+        if (!HostsDocument.IsValidIpAddress(ip))
+        {
+            Warn("IPアドレスの形式が正しくありません。\nIPv4（例: 10.0.0.1）または IPv6（例: ::1）で入力してください。");
+            IpTextBox.Focus();
+            return;
+        }
+        if (!HostsDocument.IsValidHostname(hostname))
+        {
+            Warn("ホスト名に使えるのは半角英数字と . _ - だけです（空白で区切った複数指定もできません）。");
+            HostnameTextBox.Focus();
+            return;
+        }
+        if (!HostsDocument.IsValidComment(comment))
+        {
+            Warn("コメントに # は使えません（hosts の行が壊れるため）。");
+            CommentTextBox.Focus();
             return;
         }
 
@@ -208,7 +228,7 @@ public partial class EntryDialog : Window
         {
             IpAddress = ip,
             Hostname = hostname,
-            Comment = CommentTextBox.Text.Trim(),
+            Comment = comment,
             GroupName = string.IsNullOrEmpty(groupName) ? null : groupName,
             IsEnabled = _existing?.IsEnabled ?? true,
         };
@@ -216,6 +236,9 @@ public partial class EntryDialog : Window
         DialogResult = true;
         Close();
     }
+
+    private static void Warn(string message)
+        => MessageBox.Show(message, "Hatch", MessageBoxButton.OK, MessageBoxImage.Warning);
 
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {

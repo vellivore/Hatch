@@ -157,7 +157,18 @@
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
                         <GridViewColumn Width="150" Header="IPアドレス" DisplayMemberBinding="{Binding IpAddress}"/>
-                        <GridViewColumn Width="220" Header="ホスト名" DisplayMemberBinding="{Binding Hostname}"/>
+                        <GridViewColumn Width="220" Header="ホスト名">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#x26A0; " Foreground="#E0A040"
+                                                   ToolTip="同じホスト名が別の行でも有効です"
+                                                   Visibility="{Binding HasConflict, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        <TextBlock Text="{Binding Hostname}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
                         <GridViewColumn Width="200" Header="コメント" DisplayMemberBinding="{Binding Comment}"/>
                     </GridView>
                 </ListView.View>
