@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Threading;
 using System.Windows;
@@ -12,23 +13,42 @@ public partial class App : Application
 {
     private static Mutex? _mutex;
     private static EventWaitHandle? _showEvent;
+    private static Thread? _listenerThread;
+    private static volatile bool _stopping;
     private const string MutexName = "Hatch_SingleInstance_Mutex";
     private const string EventName = "Hatch_ShowWindow_Event";
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        // hosts 書込には管理者権限が必須。非昇格で起動された場合は
-        // UAC で自身を昇格起動し直し、このインスタンスは終了する。
-        // （単一ファイル publish ではマニフェストの requireAdministrator が
-        //   効かない場合があるため、コードで確実に昇格させる）
+        // 1. 単一インスタンス確認を昇格より先に行う。
+        //    既に起動中なら UAC を出さずに既存インスタンスへ表示要求だけ送って終了する。
+        if (!TryAcquireSingleInstance())
+        {
+            SignalExistingInstance();
+            Shutdown();
+            return;
+        }
+
+        // 2. hosts 書込には管理者権限が必須。非昇格で起動された場合は
+        //    UAC で自身を昇格起動し直し、このインスタンスは終了する。
+        //    （単一ファイル publish ではマニフェストの requireAdministrator が
+        //      効かない場合があるため、コードで確実に昇格させる）
         if (!IsRunningAsAdmin())
         {
+            // 昇格後のインスタンスがミューテックスを取れるよう、先に手放す
+            ReleaseSingleInstance();
             if (TryRelaunchAsAdmin())
             {
                 Shutdown();
                 return;
             }
             // ユーザーが UAC を拒否 → 読み取り専用で続行（保存時に従来の警告）
+            if (!TryAcquireSingleInstance())
+            {
+                SignalExistingInstance();
+                Shutdown();
+                return;
+            }
         }
 
         DispatcherUnhandledException += (_, args) =>
@@ -38,52 +58,140 @@ public partial class App : Application
             args.Handled = true;
         };
 
-        _mutex = new Mutex(true, MutexName, out bool createdNew);
-
-        if (!createdNew)
-        {
-            // 既に起動中 → イベントをシグナルして既存インスタンスのウィンドウを表示させる
-            try
-            {
-                var evt = EventWaitHandle.OpenExisting(EventName);
-                evt.Set();
-                evt.Dispose();
-            }
-            catch { }
-            Shutdown();
-            return;
-        }
-
         // 他インスタンスからの表示要求を待つイベント
-        _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, EventName);
-        var thread = new Thread(() =>
-        {
-            while (_showEvent.WaitOne())
-            {
-                Dispatcher.Invoke(() =>
-                {
-                    MainWindow?.Show();
-                    MainWindow!.WindowState = WindowState.Normal;
-                    MainWindow.Activate();
-                });
-            }
-        })
+        _showEvent = CreateShowEvent();
+        _listenerThread = new Thread(ListenForShowRequests)
         {
             IsBackground = true,
             Name = "Hatch_ShowWindowListener"
         };
-        thread.Start();
+        _listenerThread.Start();
 
         base.OnStartup(e);
     }
 
+    private void ListenForShowRequests()
+    {
+        var evt = _showEvent;
+        if (evt == null) return;
+        try
+        {
+            while (!_stopping)
+            {
+                evt.WaitOne();
+                if (_stopping) break;
+
+                var dispatcher = Dispatcher;
+                if (dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished) break;
+                dispatcher.BeginInvoke(() =>
+                {
+                    if (_stopping || MainWindow == null) return;
+                    MainWindow.Show();
+                    MainWindow.WindowState = WindowState.Normal;
+                    MainWindow.Activate();
+                });
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+            // 終了処理と競合した場合は黙って抜ける
+        }
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
-        _showEvent?.Set(); // リスナースレッドを解放
+        // 停止フラグを先に立ててから起こす（リスナーは起床後にフラグを見て抜ける）
+        _stopping = true;
+        try { _showEvent?.Set(); } catch (ObjectDisposedException) { }
+        _listenerThread?.Join(1000);
         _showEvent?.Dispose();
-        _mutex?.ReleaseMutex();
-        _mutex?.Dispose();
+        _showEvent = null;
+        ReleaseSingleInstance();
         base.OnExit(e);
+    }
+
+    /// <summary>
+    /// 単一インスタンス用ミューテックスを取得する。取得できれば true。
+    /// 既に別インスタンス（昇格済みを含む）が保持していれば false。
+    /// </summary>
+    private static bool TryAcquireSingleInstance()
+    {
+        try
+        {
+            var mutex = MutexAcl.Create(true, MutexName, out bool createdNew, CreateMutexSecurity());
+            if (!createdNew)
+            {
+                mutex.Dispose();
+                return false;
+            }
+            _mutex = mutex;
+            return true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // 他インスタンスが作成したミューテックスを開く権限がない場合も「起動中」とみなす
+            return false;
+        }
+    }
+
+    private static void ReleaseSingleInstance()
+    {
+        if (_mutex == null) return;
+        try { _mutex.ReleaseMutex(); } catch (ApplicationException) { }
+        _mutex.Dispose();
+        _mutex = null;
+    }
+
+    private static void SignalExistingInstance()
+    {
+        try
+        {
+            using var evt = EventWaitHandle.OpenExisting(EventName);
+            evt.Set();
+        }
+        catch
+        {
+            // 既存インスタンスがまだイベントを作っていない等。致命的ではない
+        }
+    }
+
+    /// <summary>
+    /// 表示要求イベントを作成する。昇格済みインスタンスが作ったイベントを
+    /// 非昇格の 2 回目起動からシグナルできるよう、現在ユーザーにもアクセスを許可する。
+    /// </summary>
+    private static EventWaitHandle CreateShowEvent()
+    {
+        var security = new EventWaitHandleSecurity();
+        foreach (var sid in AllowedSids())
+        {
+            security.AddAccessRule(new EventWaitHandleAccessRule(
+                sid, EventWaitHandleRights.FullControl, AccessControlType.Allow));
+        }
+        return EventWaitHandleAcl.Create(false, EventResetMode.AutoReset, EventName, out _, security);
+    }
+
+    private static MutexSecurity CreateMutexSecurity()
+    {
+        var security = new MutexSecurity();
+        foreach (var sid in AllowedSids())
+        {
+            security.AddAccessRule(new MutexAccessRule(
+                sid, MutexRights.FullControl, AccessControlType.Allow));
+        }
+        return security;
+    }
+
+    private static List<SecurityIdentifier> AllowedSids()
+    {
+        var sids = new List<SecurityIdentifier>();
+        using (var identity = WindowsIdentity.GetCurrent())
+        {
+            if (identity.User != null)
+                sids.Add(identity.User);
+        }
+        sids.Add(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null));
+        sids.Add(new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null));
+        return sids;
     }
 
     /// <summary>現在のプロセスが管理者として実行されているか。</summary>
@@ -140,18 +248,6 @@ public class InverseBoolConverter : IValueConverter
 }
 
 /// <summary>
-/// IsSystem=true のとき Opacity=0.45 でグレーアウト表示。
-/// </summary>
-public class SystemEntryOpacityConverter : IValueConverter
-{
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        => value is bool isSystem && isSystem ? 0.45 : 1.0;
-
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        => throw new NotSupportedException();
-}
-
-/// <summary>
 /// グループ名からハッシュベースで背景色を生成する。
 /// ダークテーマに合う低彩度・低明度の色を返す。
 /// </summary>
@@ -176,9 +272,25 @@ public class GroupColorConverter : IValueConverter
 
         // ルートグループで色を統一（"業務/案件A/環境A" → "業務" でハッシュ）
         var root = groupName.Split('/')[0];
-        var hash = Math.Abs(root.GetHashCode());
-        var color = Palette[hash % Palette.Length];
+        var color = Palette[StableHash(root) % (uint)Palette.Length];
         return new SolidColorBrush(color);
+    }
+
+    /// <summary>
+    /// FNV-1a (32bit) を UTF-16 コード単位に適用した決定的ハッシュ。
+    /// string.GetHashCode() はプロセスごとにランダム化されるため、色が起動ごとに変わってしまう。
+    /// </summary>
+    internal static uint StableHash(string text)
+    {
+        const uint offsetBasis = 2166136261;
+        const uint prime = 16777619;
+        var hash = offsetBasis;
+        foreach (var ch in text)
+        {
+            hash ^= ch;
+            hash *= prime;
+        }
+        return hash;
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

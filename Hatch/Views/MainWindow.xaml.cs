@@ -29,7 +29,7 @@ public partial class MainWindow : Window
         Loaded += (_, _) =>
         {
             var s = ViewModel.Settings;
-            if (!double.IsNaN(s.WindowLeft) && !double.IsNaN(s.WindowTop))
+            if (IsOnVirtualScreen(s.WindowLeft, s.WindowTop))
             {
                 Left = s.WindowLeft;
                 Top = s.WindowTop;
@@ -43,6 +43,33 @@ public partial class MainWindow : Window
 
             InitializeNotifyIcon();
         };
+    }
+
+    /// <summary>
+    /// 保存済みの左上座標が現在の仮想スクリーン（全モニタの外接矩形）内にあるか。
+    /// モニタ構成が変わって画面外に出てしまう復元を防ぐ。
+    /// </summary>
+    private static bool IsOnVirtualScreen(double left, double top)
+    {
+        if (double.IsNaN(left) || double.IsNaN(top)) return false;
+        return left >= SystemParameters.VirtualScreenLeft
+            && left < SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth
+            && top >= SystemParameters.VirtualScreenTop
+            && top < SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight;
+    }
+
+    /// <summary>
+    /// ウィンドウ位置を保存する。最小化中（トレイ格納を含む）は Left/Top が -32000 になるため
+    /// RestoreBounds（通常表示時の位置）を使う。
+    /// </summary>
+    private void SaveWindowSettings()
+    {
+        var bounds = WindowState == WindowState.Normal
+            ? new Rect(Left, Top, Width, Height)
+            : RestoreBounds;
+        if (bounds.IsEmpty)
+            bounds = new Rect(double.NaN, double.NaN, Width, Height);
+        ViewModel.SaveSettings(bounds.Left, bounds.Top, bounds.Width, bounds.Height);
     }
 
     private void ColumnHeader_Click(object sender, RoutedEventArgs e)
@@ -152,7 +179,7 @@ public partial class MainWindow : Window
         var exitItem = new WinForms.ToolStripMenuItem("終了");
         exitItem.Click += (_, _) => Dispatcher.Invoke(() =>
         {
-            ViewModel.SaveSettings(Left, Top, Width, Height);
+            SaveWindowSettings();
             _notifyIcon?.Dispose();
             _notifyIcon = null;
             Application.Current.Shutdown();
@@ -202,7 +229,7 @@ public partial class MainWindow : Window
     private void CloseButton_Click(object sender, RoutedEventArgs e)
     {
         // ✕ ボタンはトレイに格納（終了はトレイメニューから）
-        ViewModel.SaveSettings(Left, Top, Width, Height);
+        SaveWindowSettings();
         Hide();
     }
 
@@ -254,7 +281,7 @@ public partial class MainWindow : Window
         };
         if (dialog.ShowDialog() == true)
         {
-            ViewModel.UpdatePresets(dialog.ResultPresets);
+            ViewModel.UpdatePresets(dialog.ResultPresets, dialog.ResultRenames);
         }
     }
 
@@ -264,15 +291,6 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog() == true)
         {
             ViewModel.SaveCurrentStateAsPreset(dialog.ResultName);
-        }
-    }
-
-    private void CheckBox_Click(object sender, RoutedEventArgs e)
-    {
-        // CheckBox の TwoWay バインディングで IsEnabled は既に更新済み
-        if (sender is CheckBox cb && cb.DataContext is HostEntry entry)
-        {
-            // IsEnabled は既にバインディングで変更済みなので何もしない
         }
     }
 
@@ -343,7 +361,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
-        ViewModel.SaveSettings(Left, Top, Width, Height);
+        SaveWindowSettings();
         _notifyIcon?.Dispose();
         _notifyIcon = null;
         base.OnClosed(e);

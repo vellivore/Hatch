@@ -61,55 +61,67 @@ public partial class MainViewModel : ObservableObject
 
     private void LoadPresets()
     {
-        Presets.Clear();
-        foreach (var dto in _settings.Presets)
-        {
-            Presets.Add(new Preset
-            {
-                Name = dto.Name,
-                EnabledGroups = new ObservableCollection<string>(dto.EnabledGroups),
-            });
-        }
-        RebuildPresetNames();
+        Presets = new ObservableCollection<Preset>(_settings.Presets.Select(p => p.Clone()));
 
-        // アクティブプリセットを復元
-        SelectedPresetName = !string.IsNullOrEmpty(_settings.ActivePresetName)
+        // アクティブプリセットを復元（起動時は hosts に書かない）
+        var active = !string.IsNullOrEmpty(_settings.ActivePresetName)
             && Presets.Any(p => p.Name == _settings.ActivePresetName)
-            ? _settings.ActivePresetName
+            ? _settings.ActivePresetName!
             : "なし";
+        RebuildPresetNames(active);
     }
 
     private void SavePresets()
     {
-        _settings.Presets = Presets.Select(p => new PresetDto
-        {
-            Name = p.Name,
-            EnabledGroups = p.EnabledGroups.ToList(),
-        }).ToList();
+        _settings.Presets = Presets.Select(p => p.Clone()).ToList();
         _settings.ActivePresetName = SelectedPresetName == "なし" ? null : SelectedPresetName;
     }
 
-    private void RebuildPresetNames()
+    /// <summary>
+    /// ComboBox の項目を作り直し、選択を <paramref name="selected"/> に合わせる。
+    /// PresetNames.Clear() の時点で ComboBox が TwoWay バインド経由で SelectedPresetName に
+    /// null を押し込むため、作り直しの間はプリセット適用（hosts 書込）を抑止する。
+    /// </summary>
+    private void RebuildPresetNames(string selected)
     {
-        PresetNames.Clear();
-        PresetNames.Add("なし");
-        foreach (var p in Presets)
-            PresetNames.Add(p.Name);
+        _suppressPresetApply = true;
+        try
+        {
+            PresetNames.Clear();
+            PresetNames.Add("なし");
+            foreach (var p in Presets)
+                PresetNames.Add(p.Name);
+
+            SelectedPresetName = PresetNames.Contains(selected) ? selected : "なし";
+        }
+        finally
+        {
+            _suppressPresetApply = false;
+        }
+        OnPropertyChanged(nameof(PresetNames));
     }
 
-    public void UpdatePresets(List<Preset> newPresets)
+    /// <summary>
+    /// プリセット管理ダイアログの結果を反映する。
+    /// 有効プリセットが削除されたときだけ「なし」を適用する。それ以外（変更なし・名前変更・
+    /// グループ構成の変更）では有効プリセットを変えず、hosts にも書き込まない。
+    /// </summary>
+    public void UpdatePresets(List<Preset> newPresets, IReadOnlyDictionary<string, string> renames)
     {
-        Presets = new ObservableCollection<Preset>(newPresets);
-        RebuildPresetNames();
+        var previous = string.IsNullOrEmpty(SelectedPresetName) ? "なし" : SelectedPresetName;
+        var target = previous != "なし" && renames.TryGetValue(previous, out var renamed)
+            ? renamed
+            : previous;
 
-        // 現在のアクティブプリセットが削除されていた場合は「なし」に戻す
-        if (SelectedPresetName != "なし" && !Presets.Any(p => p.Name == SelectedPresetName))
-        {
-            SelectedPresetName = "なし";
-        }
+        Presets = new ObservableCollection<Preset>(newPresets);
+        var activeDeleted = target != "なし" && !Presets.Any(p => p.Name == target);
+        RebuildPresetNames(activeDeleted ? "なし" : target);
 
         SavePresets();
         _settingsService.Save(_settings);
+
+        if (activeDeleted)
+            ApplyPreset("なし");
     }
 
     public void SaveCurrentStateAsPreset(string name)
@@ -137,15 +149,19 @@ public partial class MainViewModel : ObservableObject
             });
         }
 
-        RebuildPresetNames();
-        SelectedPresetName = name;
+        // 現在の状態をそのまま保存したので、選択を合わせるだけで hosts には書かない
+        RebuildPresetNames(name);
         SavePresets();
         _settingsService.Save(_settings);
         StatusText = $"プリセット「{name}」を保存しました";
     }
 
+    private bool _suppressPresetApply;
+
     partial void OnSelectedPresetNameChanged(string value)
     {
+        // 項目の作り直し中に ComboBox が押し込む null / 復元値では適用しない
+        if (_suppressPresetApply || string.IsNullOrEmpty(value)) return;
         ApplyPreset(value);
     }
 
@@ -249,59 +265,6 @@ public partial class MainViewModel : ObservableObject
                     entry.GroupName = group;
             }
         }
-    }
-
-    private void SaveGroupList()
-    {
-        _settings.Groups = Groups.Where(g => g != "すべて").ToList();
-    }
-
-    public void RenameGroup(string oldName, string newName)
-    {
-        // エントリのグループ名を更新
-        foreach (var entry in Entries)
-        {
-            if (entry.GroupName == oldName)
-                entry.GroupName = newName;
-        }
-
-        // プリセット内のグループ名も更新
-        foreach (var preset in Presets)
-        {
-            var idx = preset.EnabledGroups.IndexOf(oldName);
-            if (idx >= 0)
-                preset.EnabledGroups[idx] = newName;
-        }
-    }
-
-    public void UpdateGroups(List<string> updatedGroups)
-    {
-        var oldGroups = Groups.Where(g => g != "すべて").ToList();
-
-        // 削除されたグループに属するエントリのグループを空にする
-        foreach (var entry in Entries)
-        {
-            if (!string.IsNullOrEmpty(entry.GroupName) && !updatedGroups.Contains(entry.GroupName))
-                entry.GroupName = null;
-        }
-
-        // 名前変更: 旧グループ名→新グループ名のマッピングは GroupDialog 側で処理済み
-        // ここでは新しいグループ一覧でリビルドするだけ
-        RebuildGroups();
-
-        // 新規追加されたグループを Groups に反映（エントリがなくても表示するため）
-        foreach (var g in updatedGroups)
-        {
-            if (!Groups.Contains(g))
-                Groups.Add(g);
-        }
-
-        // グループ一覧を設定ファイルに即時保存
-        SaveGroupList();
-        _settingsService.Save(_settings);
-
-        IsDirty = true;
-        UpdateStatus();
     }
 
     [RelayCommand]
@@ -437,11 +400,7 @@ public partial class MainViewModel : ObservableObject
     {
         var groupSet = new SortedSet<string>();
 
-        // 設定ファイルに保存されたグループを復元
-        foreach (var g in _settings.Groups)
-            groupSet.Add(g);
-
-        // エントリに割り当てられたグループも追加
+        // エントリに割り当てられたグループ
         foreach (var e in Entries)
         {
             if (!string.IsNullOrEmpty(e.GroupName))

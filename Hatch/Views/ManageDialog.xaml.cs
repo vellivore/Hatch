@@ -14,7 +14,15 @@ public partial class ManageDialog : Window
     private Preset? _selectedPreset;
     private bool _suppressPresetNameUpdate;
 
+    // 編集用コピー → 開いた時点の名前（名前変更の追跡用）
+    private readonly Dictionary<Preset, string> _originalNames = new();
+
     public List<Preset> ResultPresets => _presets.ToList();
+
+    /// <summary>名前が変わったプリセットの 旧名 → 新名。</summary>
+    public IReadOnlyDictionary<string, string> ResultRenames =>
+        _presets.Where(p => _originalNames.TryGetValue(p, out var orig) && orig != p.Name)
+                .ToDictionary(p => _originalNames[p], p => p.Name);
 
     public ManageDialog(List<string> groups, IEnumerable<Preset> presets)
     {
@@ -22,6 +30,8 @@ public partial class ManageDialog : Window
 
         _groups = new List<string>(groups);
         _presets = new ObservableCollection<Preset>(presets.Select(p => p.Clone()));
+        foreach (var p in _presets)
+            _originalNames[p] = p.Name;
 
         RefreshPresetList();
 

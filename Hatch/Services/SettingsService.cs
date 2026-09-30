@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Hatch.Models;
 
 namespace Hatch.Services;
 
@@ -49,11 +50,6 @@ public class AppSettings
     public double WindowHeight { get; set; } = 560;
 
     /// <summary>
-    /// 登録済みグループ名の一覧（エントリ紐付けがなくても永続化）
-    /// </summary>
-    public List<string> Groups { get; set; } = new();
-
-    /// <summary>
     /// グループ名 → エントリのホスト名リスト（hostsファイルにはグループ情報がないため設定で保持）
     /// </summary>
     public Dictionary<string, List<string>> GroupAssignments { get; set; } = new();
@@ -61,19 +57,10 @@ public class AppSettings
     /// <summary>
     /// プリセット一覧
     /// </summary>
-    public List<PresetDto> Presets { get; set; } = new();
+    public List<Preset> Presets { get; set; } = new();
 
     /// <summary>
     /// 現在アクティブなプリセット名（null = なし）
     /// </summary>
     public string? ActivePresetName { get; set; }
-}
-
-/// <summary>
-/// JSON シリアライズ用の Preset DTO
-/// </summary>
-public class PresetDto
-{
-    public string Name { get; set; } = "";
-    public List<string> EnabledGroups { get; set; } = new();
 }

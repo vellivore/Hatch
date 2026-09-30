@@ -7,7 +7,6 @@
 
         <!-- Converters -->
         <local:InverseBoolConverter x:Key="InverseBoolConverter"/>
-        <local:SystemEntryOpacityConverter x:Key="SystemEntryOpacityConverter"/>
         <local:GroupColorConverter x:Key="GroupColorConverter"/>
         <local:GroupDisplayConverter x:Key="GroupDisplayConverter"/>
 
@@ -47,7 +46,7 @@
 
         <!-- Icon text style for Segoe Fluent Icons -->
         <Style x:Key="IconText" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="Segoe Fluent Icons"/>
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="Foreground" Value="#D0D0D4"/>
             <Setter Property="VerticalAlignment" Value="Center"/>

@@ -58,7 +58,7 @@
                 <DockPanel>
                     <!-- Preset (右寄せ) -->
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                        <TextBlock Text="&#xE74E;" FontFamily="Segoe Fluent Icons" FontSize="13"
+                        <TextBlock Text="&#xE74E;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13"
                                    Foreground="#808090" VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <ComboBox ItemsSource="{Binding PresetNames}"
                                   SelectedItem="{Binding SelectedPresetName}"
@@ -127,8 +127,7 @@
                                 <DataTemplate>
                                     <CheckBox IsChecked="{Binding IsEnabled, Mode=TwoWay}"
                                               IsEnabled="{Binding IsSystem, Converter={StaticResource InverseBoolConverter}}"
-                                              HorizontalAlignment="Center"
-                                              Click="CheckBox_Click"/>
+                                              HorizontalAlignment="Center"/>
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
