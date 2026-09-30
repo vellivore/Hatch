@@ -18,7 +18,7 @@
         <TextBlock Grid.Row="0" Text="プリセット名:" Margin="0,0,0,8" FontSize="13"
                    Foreground="#E0E0E0"/>
 
-        <TextBox Grid.Row="1" x:Name="NameTextBox"
+        <TextBox Grid.Row="1" x:Name="NameTextBox" AutomationProperties.AutomationId="PresetNameInput"
                  FontSize="13" Padding="4,4" Margin="0,0,0,12"
                  Background="#2D2D30" Foreground="#E0E0E0"
                  CaretBrush="#E0E0E0" BorderBrush="#3F3F46"
@@ -26,7 +26,7 @@
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="保存" Width="80" Height="28" Margin="0,0,8,0"
-                    IsDefault="True" Click="OK_Click"
+                    IsDefault="True" Click="OK_Click" AutomationProperties.AutomationId="PresetNameOkButton"
                     Background="#0078D4" Foreground="White" BorderBrush="#0078D4"/>
             <Button Content="キャンセル" Width="80" Height="28"
                     IsCancel="True"

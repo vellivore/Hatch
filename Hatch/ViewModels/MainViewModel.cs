@@ -27,8 +27,8 @@ public partial class MainViewModel : ObservableObject
 {
     private const string AllGroups = "すべて";
 
-    private readonly HostsFileService _hostsService = new();
-    private readonly SettingsService _settingsService = new();
+    private readonly HostsFileService _hostsService = StartupOptions.Current.CreateHostsService();
+    private readonly SettingsService _settingsService = StartupOptions.Current.CreateSettingsService();
     private AppSettings _settings = new();
 
     [ObservableProperty]

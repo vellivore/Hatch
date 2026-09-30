@@ -39,7 +39,7 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <ListBox x:Name="PresetListBox" Grid.Row="0"
+                    <ListBox x:Name="PresetListBox" AutomationProperties.AutomationId="ManagePresetList" Grid.Row="0"
                              Background="#2D2D30" Foreground="#E0E0E0"
                              BorderBrush="#3F3F46" BorderThickness="1" FontSize="13"
                              SelectionChanged="PresetListBox_SelectionChanged">
@@ -70,7 +70,7 @@
                     </ListBox>
 
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,0">
-                        <Button Content="削除" Click="DeletePreset_Click"
+                        <Button Content="削除" Click="DeletePreset_Click" AutomationProperties.AutomationId="ManageDeletePresetButton"
                                 Style="{StaticResource ToolbarButton}"
                                 Padding="10,4"/>
                     </StackPanel>
@@ -88,7 +88,7 @@
 
                     <TextBlock Grid.Row="0" Text="プリセット名:" FontSize="12"
                                Foreground="#808090" Margin="0,0,0,4"/>
-                    <TextBox Grid.Row="1" x:Name="PresetNameTextBox"
+                    <TextBox Grid.Row="1" x:Name="PresetNameTextBox" AutomationProperties.AutomationId="ManagePresetNameTextBox"
                              FontSize="13" Padding="6,5" Margin="0,0,0,12"
                              Background="#2D2D30" Foreground="#E0E0E0"
                              CaretBrush="#E0E0E0" BorderBrush="#3F3F46"
@@ -107,7 +107,7 @@
                                   VerticalScrollBarVisibility="Auto"
                                   Background="#2D2D30"
                                   BorderBrush="#3F3F46" BorderThickness="1" Padding="4">
-                        <StackPanel x:Name="GroupCheckBoxPanel"/>
+                        <StackPanel x:Name="GroupCheckBoxPanel" AutomationProperties.AutomationId="ManageGroupPanel"/>
                     </ScrollViewer>
                 </Grid>
             </Grid>
@@ -115,7 +115,7 @@
             <!-- Bottom -->
             <StackPanel Grid.Row="2" Orientation="Horizontal"
                         HorizontalAlignment="Right" Margin="0,12,0,0">
-                <Button Content="閉じる" Click="Close_Click"
+                <Button Content="閉じる" Click="Close_Click" AutomationProperties.AutomationId="ManageCloseButton"
                         Width="80" Height="30"
                         Background="#3F3F46" Foreground="#E0E0E0"
                         BorderBrush="#3F3F46" Cursor="Hand" FontSize="13"/>

@@ -112,6 +112,7 @@ public partial class ManageDialog : Window
                 Margin = new Thickness(4 + PresetLogic.Depth(group) * 20, 4, 4, 4),
                 Tag = group,
             };
+            System.Windows.Automation.AutomationProperties.SetAutomationId(cb, "GroupCheck:" + group);
             cb.Checked += GroupCheckBox_Changed;
             cb.Unchecked += GroupCheckBox_Changed;
             GroupCheckBoxPanel.Children.Add(cb);

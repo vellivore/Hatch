@@ -85,6 +85,22 @@ v1.x はグループを `hatch-config.json` の `GroupAssignments` に保存し�
 
 v1.x の設定ファイルは exe と同じフォルダにあるので、そのまま同じフォルダで v2.0 を起動すれば引き継がれます。
 
+## 開発者向け
+
+実際の hosts を触らず、UAC なしで画面の動作を確認するためのコマンドライン指定です。
+
+| 指定 | 動作 |
+|------|------|
+| `--hosts <path>` | 指定したファイルを hosts として読み書きします。自動バックアップは `%LOCALAPPDATA%\Hatch\backups\dev\` に保存します。タイトルバーに `[dev: <path>]` を表示します |
+| `--no-elevate` | 管理者への自己昇格をしません。`--hosts` と一緒に指定したときだけ有効で、単独では無視します |
+| `--config <path>` | 指定したファイルを設定ファイルとして使います |
+
+```
+Hatch.exe --hosts .\test-hosts.txt --config .\test-config.json --no-elevate
+```
+
+主なボタン・入力欄・一覧には UI Automation 用の `AutomationId` を付けています（例: `PresetComboBox`・`ApplyButton`・`EntryListView`・`SwitchDiscardButton`）。
+
 ## スクリーンショット
 
 ダークテーマ UI、グループ別の色タグで視認性を確保。

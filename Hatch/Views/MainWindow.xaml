@@ -39,7 +39,7 @@
 
                 <!-- Window Controls -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0">
-                    <Button Content="&#x2715;" Click="CloseButton_Click"
+                    <Button Content="&#x2715;" Click="CloseButton_Click" AutomationProperties.AutomationId="CloseToTrayButton"
                             Width="40" Height="28"
                             Background="Transparent" Foreground="#808080"
                             BorderThickness="0" FontSize="12" Cursor="Hand"
@@ -56,7 +56,7 @@
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                         <TextBlock Text="&#xE74E;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13"
                                    Foreground="#808090" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                        <ComboBox x:Name="PresetComboBox"
+                        <ComboBox x:Name="PresetComboBox" AutomationProperties.AutomationId="PresetComboBox"
                                   ItemsSource="{Binding PresetNames}"
                                   SelectedItem="{Binding SelectedPresetName, Mode=OneWay}"
                                   SelectionChanged="PresetComboBox_SelectionChanged"
@@ -70,45 +70,45 @@
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
-                        <Button Click="SavePreset_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="プリセット保存"
+                        <Button Click="SavePreset_Click" AutomationProperties.AutomationId="SavePresetButton" Style="{StaticResource ToolbarIconButton}" ToolTip="プリセット保存"
                                 Margin="4,0,0,0">
                             <TextBlock Text="&#xE105;" Style="{StaticResource IconText}"/>
                         </Button>
-                        <Button Click="ManageButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="プリセット管理">
+                        <Button Click="ManageButton_Click" AutomationProperties.AutomationId="ManagePresetsButton" Style="{StaticResource ToolbarIconButton}" ToolTip="プリセット管理">
                             <TextBlock Text="&#xE713;" Style="{StaticResource IconText}"/>
                         </Button>
                     </StackPanel>
 
                     <!-- Left: Entry operations -->
                     <StackPanel Orientation="Horizontal">
-                        <Button Click="AddButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="追加">
+                        <Button Click="AddButton_Click" AutomationProperties.AutomationId="AddButton" Style="{StaticResource ToolbarIconButton}" ToolTip="追加">
                             <TextBlock Text="&#xE710;" Style="{StaticResource IconText}"/>
                         </Button>
-                        <Button Click="EditButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="編集">
+                        <Button Click="EditButton_Click" AutomationProperties.AutomationId="EditButton" Style="{StaticResource ToolbarIconButton}" ToolTip="編集">
                             <TextBlock Text="&#xE70F;" Style="{StaticResource IconText}"/>
                         </Button>
-                        <Button Click="DeleteButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="削除">
+                        <Button Click="DeleteButton_Click" AutomationProperties.AutomationId="DeleteButton" Style="{StaticResource ToolbarIconButton}" ToolTip="削除">
                             <TextBlock Text="&#xE74D;" Style="{StaticResource IconText}"/>
                         </Button>
 
                         <Border Width="1" Background="#383840" Margin="6,4,6,4"/>
 
-                        <Button Click="ReloadButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="最新化 (F5)">
+                        <Button Click="ReloadButton_Click" AutomationProperties.AutomationId="ReloadButton" Style="{StaticResource ToolbarIconButton}" ToolTip="最新化 (F5)">
                             <TextBlock Text="&#xE72C;" Style="{StaticResource IconText}"/>
                         </Button>
-                        <Button Click="ApplyButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="適用 (Ctrl+S)">
+                        <Button Click="ApplyButton_Click" AutomationProperties.AutomationId="ApplyButton" Style="{StaticResource ToolbarIconButton}" ToolTip="適用 (Ctrl+S)">
                             <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}"/>
                         </Button>
 
                         <Border Width="1" Background="#383840" Margin="6,4,6,4"/>
 
-                        <Button Click="TextEditorButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="テキスト編集">
+                        <Button Click="TextEditorButton_Click" AutomationProperties.AutomationId="TextEditorButton" Style="{StaticResource ToolbarIconButton}" ToolTip="テキスト編集">
                             <TextBlock Text="&#xE7C5;" Style="{StaticResource IconText}"/>
                         </Button>
-                        <Button Click="BackupButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="バックアップ">
+                        <Button Click="BackupButton_Click" AutomationProperties.AutomationId="BackupButton" Style="{StaticResource ToolbarIconButton}" ToolTip="バックアップ">
                             <TextBlock Text="&#xE78C;" Style="{StaticResource IconText}"/>
                         </Button>
-                        <Button Click="RestoreButton_Click" Style="{StaticResource ToolbarIconButton}" ToolTip="リストア">
+                        <Button Click="RestoreButton_Click" AutomationProperties.AutomationId="RestoreButton" Style="{StaticResource ToolbarIconButton}" ToolTip="リストア">
                             <TextBlock Text="&#xE7AC;" Style="{StaticResource IconText}"/>
                         </Button>
                     </StackPanel>
@@ -118,6 +118,7 @@
             <!-- Entry List -->
             <ListView Grid.Row="2"
                       x:Name="EntryListView"
+                      AutomationProperties.AutomationId="EntryListView"
                       ItemsSource="{Binding FilteredEntries}"
                       SelectedItem="{Binding SelectedEntry}"
                       Background="#1E1E2E"
@@ -181,7 +182,7 @@
             <!-- Status Bar -->
             <Border Grid.Row="3" Background="#1A1A22" BorderBrush="#383840" BorderThickness="0,1,0,0">
                 <DockPanel Margin="12,4">
-                    <TextBlock Text="{Binding StatusText}"
+                    <TextBlock Text="{Binding StatusText}" AutomationProperties.AutomationId="StatusText"
                                FontSize="11" Foreground="#808090"
                                VerticalAlignment="Center"/>
                 </DockPanel>

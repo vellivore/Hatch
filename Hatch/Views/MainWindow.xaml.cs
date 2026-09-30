@@ -41,7 +41,9 @@ public partial class MainWindow : Window
 
             var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
             var versionStr = version != null ? $"v{version.Major}.{version.Minor}.{version.Build}" : "";
-            TitleText.Text = $"Hatch {versionStr}";
+            TitleText.Text = StartupOptions.Current.HostsPath == null
+                ? $"Hatch {versionStr}"
+                : $"Hatch {versionStr} [dev: {StartupOptions.Current.HostsPath}]";
 
             InitializeNotifyIcon();
         };
@@ -514,6 +516,11 @@ public partial class MainWindow : Window
 
     private void TextEditorButton_Click(object sender, RoutedEventArgs e)
     {
+        // テキスト編集は hosts の現在の内容を開き、保存すると一覧を読み直すため未保存の変更は失われる
+        if (ViewModel.IsDirty
+            && !ConfirmDialog.Ask(this, "未保存の変更があります。テキスト編集を開くと破棄されます。", "続行"))
+            return;
+
         var content = ViewModel.ReadHostsRaw();
         var dialog = new TextEditorDialog(content) { Owner = this };
         if (dialog.ShowDialog() == true && dialog.Saved)

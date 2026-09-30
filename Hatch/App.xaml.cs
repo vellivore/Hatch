@@ -6,6 +6,7 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
+using Hatch.Services;
 
 namespace Hatch;
 
@@ -20,6 +21,8 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        StartupOptions.Current = StartupOptions.Parse(e.Args);
+
         // 1. 単一インスタンス確認を昇格より先に行う。
         //    既に起動中なら UAC を出さずに既存インスタンスへ表示要求だけ送って終了する。
         if (!TryAcquireSingleInstance())
@@ -33,11 +36,11 @@ public partial class App : Application
         //    UAC で自身を昇格起動し直し、このインスタンスは終了する。
         //    （単一ファイル publish ではマニフェストの requireAdministrator が
         //      効かない場合があるため、コードで確実に昇格させる）
-        if (!IsRunningAsAdmin())
+        if (!IsRunningAsAdmin() && !StartupOptions.Current.SkipElevation)
         {
             // 昇格後のインスタンスがミューテックスを取れるよう、先に手放す
             ReleaseSingleInstance();
-            if (TryRelaunchAsAdmin())
+            if (TryRelaunchAsAdmin(StartupOptions.Current.ToArgs()))
             {
                 Shutdown();
                 return;
@@ -207,7 +210,7 @@ public partial class App : Application
     /// 成功すれば true（呼び出し側は現インスタンスを終了する）。
     /// UAC 拒否・失敗時は false。
     /// </summary>
-    private static bool TryRelaunchAsAdmin()
+    private static bool TryRelaunchAsAdmin(IReadOnlyList<string> args)
     {
         // 単一ファイル publish では Environment.ProcessPath が apphost(.exe) を指す
         var exePath = Environment.ProcessPath;
@@ -221,6 +224,8 @@ public partial class App : Application
             Verb = "runas",
             WorkingDirectory = AppContext.BaseDirectory,
         };
+        foreach (var arg in args)
+            psi.ArgumentList.Add(arg);
 
         try
         {

@@ -28,15 +28,15 @@
                        TextWrapping="Wrap" Margin="0,0,0,20"/>
 
             <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="適用して切替" Click="ApplyAndSwitch_Click"
+                <Button Content="適用して切替" Click="ApplyAndSwitch_Click" AutomationProperties.AutomationId="SwitchApplyButton"
                         MinWidth="110" Height="30" Padding="10,0" Margin="0,0,8,0"
                         Background="#0078D4" Foreground="White" BorderBrush="#0078D4"
                         Cursor="Hand" FontSize="13" IsDefault="True"/>
-                <Button Content="破棄して切替" Click="DiscardAndSwitch_Click"
+                <Button Content="破棄して切替" Click="DiscardAndSwitch_Click" AutomationProperties.AutomationId="SwitchDiscardButton"
                         MinWidth="110" Height="30" Padding="10,0" Margin="0,0,8,0"
                         Background="#3F3F46" Foreground="#E0E0E0" BorderBrush="#3F3F46"
                         Cursor="Hand" FontSize="13"/>
-                <Button Content="キャンセル" Click="Cancel_Click"
+                <Button Content="キャンセル" Click="Cancel_Click" AutomationProperties.AutomationId="SwitchCancelButton"
                         MinWidth="90" Height="30" Padding="10,0"
                         Background="#3F3F46" Foreground="#E0E0E0" BorderBrush="#3F3F46"
                         Cursor="Hand" FontSize="13" IsCancel="True"/>

@@ -34,7 +34,7 @@
             <!-- IP Address -->
             <TextBlock Grid.Row="1" Text="IPアドレス:" FontSize="12"
                        Foreground="#808090" Margin="0,0,0,4"/>
-            <TextBox Grid.Row="2" x:Name="IpTextBox"
+            <TextBox Grid.Row="2" x:Name="IpTextBox" AutomationProperties.AutomationId="IpTextBox"
                      FontSize="13" Padding="6,5"
                      Margin="0,0,0,12"
                      Background="#2D2D30"
@@ -46,7 +46,7 @@
             <!-- Hostname -->
             <TextBlock Grid.Row="3" Text="ホスト名:" FontSize="12"
                        Foreground="#808090" Margin="0,0,0,4"/>
-            <TextBox Grid.Row="4" x:Name="HostnameTextBox"
+            <TextBox Grid.Row="4" x:Name="HostnameTextBox" AutomationProperties.AutomationId="HostnameTextBox"
                      FontSize="13" Padding="6,5"
                      Margin="0,0,0,12"
                      Background="#2D2D30"
@@ -58,7 +58,7 @@
             <!-- Comment -->
             <TextBlock Grid.Row="5" Text="コメント:" FontSize="12"
                        Foreground="#808090" Margin="0,0,0,4"/>
-            <TextBox Grid.Row="6" x:Name="CommentTextBox"
+            <TextBox Grid.Row="6" x:Name="CommentTextBox" AutomationProperties.AutomationId="CommentTextBox"
                      FontSize="13" Padding="6,5"
                      Margin="0,0,0,12"
                      Background="#2D2D30"
@@ -90,26 +90,26 @@
                 <TextBlock Grid.Row="0" Grid.Column="4" Text="小区分" FontSize="10"
                            Foreground="#606068" Margin="0,0,0,2"/>
                 <!-- ComboBoxes -->
-                <ComboBox Grid.Row="1" Grid.Column="0" x:Name="Group1ComboBox"
+                <ComboBox Grid.Row="1" Grid.Column="0" x:Name="Group1ComboBox" AutomationProperties.AutomationId="Group1ComboBox"
                           FontSize="12" IsEditable="True"
                           Background="#2D2D30" Foreground="#E0E0E0" BorderBrush="#3F3F46"
                           SelectionChanged="Group1_SelectionChanged"/>
-                <ComboBox Grid.Row="1" Grid.Column="2" x:Name="Group2ComboBox"
+                <ComboBox Grid.Row="1" Grid.Column="2" x:Name="Group2ComboBox" AutomationProperties.AutomationId="Group2ComboBox"
                           FontSize="12" IsEditable="True"
                           Background="#2D2D30" Foreground="#E0E0E0" BorderBrush="#3F3F46"
                           SelectionChanged="Group2_SelectionChanged"/>
-                <ComboBox Grid.Row="1" Grid.Column="4" x:Name="Group3ComboBox"
+                <ComboBox Grid.Row="1" Grid.Column="4" x:Name="Group3ComboBox" AutomationProperties.AutomationId="Group3ComboBox"
                           FontSize="12" IsEditable="True"
                           Background="#2D2D30" Foreground="#E0E0E0" BorderBrush="#3F3F46"/>
             </Grid>
 
             <!-- Buttons -->
             <StackPanel Grid.Row="9" Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="OK" Click="OK_Click" IsDefault="True"
+                <Button Content="OK" Click="OK_Click" AutomationProperties.AutomationId="EntryOkButton" IsDefault="True"
                         Width="80" Height="30" Margin="0,0,8,0"
                         Background="#0078D4" Foreground="White" BorderBrush="#0078D4"
                         Cursor="Hand" FontSize="13"/>
-                <Button Content="キャンセル" Click="Cancel_Click" IsCancel="True"
+                <Button Content="キャンセル" Click="Cancel_Click" AutomationProperties.AutomationId="EntryCancelButton" IsCancel="True"
                         Width="80" Height="30"
                         Background="#3F3F46" Foreground="#E0E0E0" BorderBrush="#3F3F46"
                         Cursor="Hand" FontSize="13"/>
