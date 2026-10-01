@@ -108,6 +108,8 @@ Hatch.exe --hosts .\test-hosts.txt --config .\test-config.json --no-elevate
 pwsh -File tools\smoke\smoke.ps1 -Exe .\publish\Hatch.exe
 ```
 
+`tools/smoke/verify-elevated.ps1` は管理者として実行し、昇格起動・非昇格の 2 回目起動の合流・実 hosts への書込と自動バックアップを確認します（実 hosts は終了時に元のバイト列へ戻します）。同じフォルダに `Hatch.exe` を置いて実行してください。
+
 ## スクリーンショット
 
 ダークテーマ UI、グループ別の色タグで視認性を確保。
